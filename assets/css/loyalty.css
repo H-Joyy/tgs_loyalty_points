@@ -2,6 +2,85 @@
    TGS Loyalty Points — Admin Styles
    ═══════════════════════════════════════════ */
 
+:root {
+  --tgs-loyalty-primary: #696cff;
+  --tgs-loyalty-primary-soft: rgba(105, 108, 255, 0.12);
+  --tgs-loyalty-primary-border: rgba(105, 108, 255, 0.28);
+}
+
+.container-xxl .text-primary,
+.container-xxl .text-success,
+.container-xxl .text-danger,
+.container-xxl .text-warning,
+.container-xxl .text-info {
+  color: var(--tgs-loyalty-primary) !important;
+}
+
+.container-xxl .bg-primary,
+.container-xxl .bg-success,
+.container-xxl .bg-danger,
+.container-xxl .bg-warning,
+.container-xxl .bg-info,
+.container-xxl .badge.bg-secondary,
+.container-xxl .badge.bg-primary,
+.container-xxl .badge.bg-success,
+.container-xxl .badge.bg-danger,
+.container-xxl .badge.bg-warning,
+.container-xxl .badge.bg-info {
+  background-color: var(--tgs-loyalty-primary) !important;
+  border-color: var(--tgs-loyalty-primary) !important;
+  color: #fff !important;
+}
+
+.container-xxl .bg-label-primary,
+.container-xxl .bg-label-success,
+.container-xxl .bg-label-danger,
+.container-xxl .bg-label-warning,
+.container-xxl .bg-label-info,
+.container-xxl .bg-label-secondary {
+  background-color: var(--tgs-loyalty-primary-soft) !important;
+  color: var(--tgs-loyalty-primary) !important;
+}
+
+.container-xxl .btn-primary,
+.container-xxl .btn-success,
+.container-xxl .btn-danger,
+.container-xxl .btn-warning,
+.container-xxl .btn-info {
+  background-color: var(--tgs-loyalty-primary) !important;
+  border-color: var(--tgs-loyalty-primary) !important;
+  color: #fff !important;
+}
+
+.container-xxl .btn-outline-primary,
+.container-xxl .btn-outline-success,
+.container-xxl .btn-outline-danger,
+.container-xxl .btn-outline-warning,
+.container-xxl .btn-outline-info {
+  color: var(--tgs-loyalty-primary) !important;
+  border-color: var(--tgs-loyalty-primary) !important;
+}
+
+.container-xxl .btn-outline-primary:hover,
+.container-xxl .btn-outline-success:hover,
+.container-xxl .btn-outline-danger:hover,
+.container-xxl .btn-outline-warning:hover,
+.container-xxl .btn-outline-info:hover {
+  background-color: var(--tgs-loyalty-primary) !important;
+  border-color: var(--tgs-loyalty-primary) !important;
+  color: #fff !important;
+}
+
+.container-xxl .alert-primary,
+.container-xxl .alert-success,
+.container-xxl .alert-danger,
+.container-xxl .alert-warning,
+.container-xxl .alert-info {
+  background-color: var(--tgs-loyalty-primary-soft) !important;
+  border-color: var(--tgs-loyalty-primary-border) !important;
+  color: var(--tgs-loyalty-primary) !important;
+}
+
 /* ── Stat Cards ── */
 #loyalty-stats .card {
   transition: box-shadow 0.2s;

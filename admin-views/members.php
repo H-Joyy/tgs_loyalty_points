@@ -17,10 +17,12 @@
                     <label class="form-label">Hạng</label>
                     <select id="filter-tier" class="form-select form-select-sm">
                         <option value="">Tất cả</option>
-                        <option value="bronze">Đồng</option>
-                        <option value="silver">Bạc</option>
-                        <option value="gold">Vàng</option>
-                        <option value="platinum">Bạch Kim</option>
+                        <?php
+                        $tiers = TGS_Loyalty_DB::get_tier_definitions();
+                        foreach ($tiers as $key => $tier) {
+                            echo '<option value="' . esc_attr($key) . '">' . esc_html($tier['name']) . '</option>';
+                        }
+                        ?>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -132,11 +134,11 @@
             refund: 'Hoàn'
         };
         const LOG_TYPE_COLORS = {
-            earn: 'success',
+            earn: 'primary',
             redeem: 'primary',
-            adjust: 'warning',
-            expire: 'secondary',
-            refund: 'info'
+            adjust: 'primary',
+            expire: 'primary',
+            refund: 'primary'
         };
 
         let currentPage = 1;
@@ -174,12 +176,12 @@
                         '<td>' + $('<span>').text(m.customer_phone || '—').html() + '</td>' +
                         '<td>' + m.tier_badge + '</td>' +
                         '<td class="text-end fw-bold">' + fmtNum(m.current_points) + '</td>' +
-                        '<td class="text-end text-success">' + fmtNum(m.total_earned) + '</td>' +
-                        '<td class="text-end text-danger">' + fmtNum(m.total_redeemed) + '</td>' +
+                        '<td class="text-end text-primary">' + fmtNum(m.total_earned) + '</td>' +
+                        '<td class="text-end text-primary">' + fmtNum(m.total_redeemed) + '</td>' +
                         '<td>' +
-                        '<button class="btn btn-sm btn-outline-success me-1 btn-add-pts" data-id="' + m.wp_user_id + '" data-name="' + $('<span>').text(m.display_name).html() + '" title="Cộng điểm"><i class="bx bx-plus"></i></button>' +
-                        '<button class="btn btn-sm btn-outline-danger me-1 btn-deduct-pts" data-id="' + m.wp_user_id + '" data-name="' + $('<span>').text(m.display_name).html() + '" title="Trừ điểm"><i class="bx bx-minus"></i></button>' +
-                        '<button class="btn btn-sm btn-outline-info btn-logs" data-id="' + m.wp_user_id + '" title="Lịch sử"><i class="bx bx-history"></i></button>' +
+                        '<button class="btn btn-sm btn-outline-primary me-1 btn-add-pts" data-id="' + m.wp_user_id + '" data-name="' + $('<span>').text(m.display_name).html() + '" title="Cộng điểm"><i class="bx bx-plus"></i></button>' +
+                        '<button class="btn btn-sm btn-outline-primary me-1 btn-deduct-pts" data-id="' + m.wp_user_id + '" data-name="' + $('<span>').text(m.display_name).html() + '" title="Trừ điểm"><i class="bx bx-minus"></i></button>' +
+                        '<button class="btn btn-sm btn-outline-primary btn-logs" data-id="' + m.wp_user_id + '" title="Lịch sử"><i class="bx bx-history"></i></button>' +
                         '</td></tr>'
                     );
                 });
@@ -262,7 +264,7 @@
                     return;
                 }
                 res.data.items.forEach(function(l) {
-                    const colorClass = parseFloat(l.points) >= 0 ? 'text-success' : 'text-danger';
+                    const colorClass = 'text-primary';
                     const prefix = parseFloat(l.points) >= 0 ? '+' : '';
                     $tbody.append(
                         '<tr>' +

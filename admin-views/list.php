@@ -2,7 +2,7 @@
 
 <div class="container-xxl flex-grow-1 container-p-y">
     <h4 class="fw-bold py-3 mb-4">
-        <span class="text-muted fw-light">Tích điểm /</span> Chính sách tích điểm
+        <span class="text-muted fw-light">Tích điểm /</span> Chương trình tích điểm
     </h4>
 
     <!-- ── TOOLBAR ── -->
@@ -39,8 +39,8 @@
                 </div>
                 <div class="col-md-3 text-end">
                     <a href="<?php echo admin_url('admin.php?page=tgs-shop-management&view=loyalty-policy-add'); ?>"
-                        class="btn btn-success btn-sm">
-                        <i class="bx bx-plus me-1"></i> Thêm chính sách
+                        class="btn btn-primary btn-sm">
+                        <i class="bx bx-plus me-1"></i> Thêm chương trình
                     </a>
                 </div>
             </div>
@@ -55,7 +55,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Mã</th>
-                        <th>Tên chính sách</th>
+                        <th>Tên chương trình</th>
                         <th>Loại</th>
                         <th>Tỷ lệ tích</th>
                         <th>Ưu tiên</th>
@@ -92,9 +92,9 @@
         };
         const TYPE_COLORS = {
             1: 'primary',
-            2: 'success',
-            3: 'warning',
-            4: 'info'
+            2: 'primary',
+            3: 'primary',
+            4: 'primary'
         };
         const STATUS_LABELS = {
             0: 'Nháp',
@@ -102,9 +102,9 @@
             2: 'Hết hạn'
         };
         const STATUS_COLORS = {
-            0: 'secondary',
-            1: 'success',
-            2: 'danger'
+            0: 'primary',
+            1: 'primary',
+            2: 'primary'
         };
 
         let currentPage = 1;
@@ -140,7 +140,7 @@
                                 earnInfo = rules.earn_rate + ' đ / ' + Number(rules.earn_unit).toLocaleString('vi-VN') + '₫';
                             }
                         } catch (e) {}
-                        const autoApply = p.auto_apply == 1 ? '<i class="bx bx-check text-success"></i>' : '<i class="bx bx-x text-muted"></i>';
+                        const autoApply = p.auto_apply == 1 ? '<i class="bx bx-check text-primary"></i>' : '<i class="bx bx-x text-muted"></i>';
                         const detailUrl = '<?php echo admin_url("admin.php?page=tgs-shop-management&view=loyalty-policy-detail"); ?>&id=' + p.loyalty_policy_id;
 
                         $tbody.append(
@@ -155,8 +155,8 @@
                             '<td>' + statusBadge + '</td>' +
                             '<td>' +
                             '<a href="' + detailUrl + '" class="btn btn-sm btn-outline-primary me-1" title="Chi tiết"><i class="bx bx-show"></i></a>' +
-                            '<button class="btn btn-sm btn-outline-warning me-1 btn-clone" data-id="' + p.loyalty_policy_id + '" title="Sao chép"><i class="bx bx-copy"></i></button>' +
-                            '<button class="btn btn-sm btn-outline-danger btn-delete" data-id="' + p.loyalty_policy_id + '" title="Xóa"><i class="bx bx-trash"></i></button>' +
+                            '<button class="btn btn-sm btn-outline-primary me-1 btn-clone" data-id="' + p.loyalty_policy_id + '" title="Sao chép"><i class="bx bx-copy"></i></button>' +
+                            '<button class="btn btn-sm btn-outline-primary btn-delete" data-id="' + p.loyalty_policy_id + '" title="Xóa"><i class="bx bx-trash"></i></button>' +
                             '</td></tr>'
                         );
                     });
@@ -186,7 +186,7 @@
         });
 
         $(document).on('click', '.btn-clone', function() {
-            if (!confirm('Sao chép chính sách này?')) return;
+            if (!confirm('Sao chép chương trình này?')) return;
             $.post(tgsLoyalty.ajaxUrl, {
                 action: 'tgs_loyalty_policy_clone',
                 nonce: tgsLoyalty.nonce,
@@ -198,7 +198,7 @@
         });
 
         $(document).on('click', '.btn-delete', function() {
-            if (!confirm('Xóa chính sách này?')) return;
+            if (!confirm('Xóa chương trình này?')) return;
             $.post(tgsLoyalty.ajaxUrl, {
                 action: 'tgs_loyalty_policy_delete',
                 nonce: tgsLoyalty.nonce,

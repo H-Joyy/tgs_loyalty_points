@@ -12,7 +12,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="content-left">
-                            <span>Tổng chính sách</span>
+                            <span>Tổng chương trình</span>
                             <div class="d-flex align-items-end mt-2">
                                 <h4 class="mb-0 me-2" id="stat-total">0</h4>
                             </div>
@@ -31,10 +31,10 @@
                         <div class="content-left">
                             <span>Đang hoạt động</span>
                             <div class="d-flex align-items-end mt-2">
-                                <h4 class="mb-0 me-2 text-success" id="stat-active">0</h4>
+                                <h4 class="mb-0 me-2 text-primary" id="stat-active">0</h4>
                             </div>
                         </div>
-                        <span class="badge bg-label-success rounded p-2">
+                        <span class="badge bg-label-primary rounded p-2">
                             <i class="bx bx-check-circle bx-sm"></i>
                         </span>
                     </div>
@@ -51,7 +51,7 @@
                                 <h4 class="mb-0 me-2" id="stat-members">0</h4>
                             </div>
                         </div>
-                        <span class="badge bg-label-info rounded p-2">
+                        <span class="badge bg-label-primary rounded p-2">
                             <i class="bx bx-group bx-sm"></i>
                         </span>
                     </div>
@@ -63,12 +63,12 @@
                 <div class="card-body">
                     <div class="d-flex align-items-start justify-content-between">
                         <div class="content-left">
-                            <span>Tổng điểm lưu hành</span>
+                            <span>Tổng điểm đang có</span>
                             <div class="d-flex align-items-end mt-2">
-                                <h4 class="mb-0 me-2 text-warning" id="stat-total-points">0</h4>
+                                <h4 class="mb-0 me-2 text-primary" id="stat-total-points">0</h4>
                             </div>
                         </div>
-                        <span class="badge bg-label-warning rounded p-2">
+                        <span class="badge bg-label-primary rounded p-2">
                             <i class="bx bx-coin-stack bx-sm"></i>
                         </span>
                     </div>
@@ -82,7 +82,7 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Loại chính sách</h5>
+                    <h5 class="mb-0">Phân loại chương trình</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -119,7 +119,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Hướng dẫn các loại chính sách tích điểm</h5>
+                    <h5 class="mb-0">Hướng dẫn nhanh</h5>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -132,21 +132,21 @@
                         </div>
                         <div class="col-md-3">
                             <div class="border rounded p-3 h-100">
-                                <span class="badge bg-success mb-2">Loại 2</span>
+                                <span class="badge bg-primary mb-2">Loại 2</span>
                                 <h6>Tích điểm theo sản phẩm</h6>
                                 <small class="text-muted">VD: Mua SP ABC → +50 điểm/SP.</small>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="border rounded p-3 h-100">
-                                <span class="badge bg-warning mb-2">Loại 3</span>
+                                <span class="badge bg-primary mb-2">Loại 3</span>
                                 <h6>Nhân hệ số điểm</h6>
                                 <small class="text-muted">VD: x2 điểm trong sự kiện, ngày lễ.</small>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="border rounded p-3 h-100">
-                                <span class="badge bg-info mb-2">Loại 4</span>
+                                <span class="badge bg-primary mb-2">Loại 4</span>
                                 <h6>Bonus sự kiện</h6>
                                 <small class="text-muted">VD: Mua từ 500.000₫ → +200 điểm bonus.</small>
                             </div>
@@ -188,7 +188,7 @@
                         );
                     });
                 } else {
-                    $tbody.append('<tr><td colspan="3" class="text-muted text-center">Chưa có chính sách</td></tr>');
+                    $tbody.append('<tr><td colspan="3" class="text-muted text-center">Chưa có chương trình</td></tr>');
                 }
             });
 
@@ -205,26 +205,17 @@
                 // Tier distribution
                 const $container = $('#tier-distribution').empty();
                 if (d.by_tier && d.by_tier.length) {
-                    const TIER_COLORS = {
-                        bronze: '#CD7F32',
-                        silver: '#8B9DC3',
-                        gold: '#F4C430',
-                        platinum: '#667EEA'
-                    };
-                    const TIER_NAMES = {
-                        bronze: 'Đồng',
-                        silver: 'Bạc',
-                        gold: 'Vàng',
-                        platinum: 'Bạch Kim'
-                    };
+                    const TIER_DEFS = <?php echo wp_json_encode(TGS_Loyalty_DB::get_tier_definitions()); ?>;
                     d.by_tier.forEach(function(t) {
-                        const color = TIER_COLORS[t.tier] || '#6c757d';
-                        const name = TIER_NAMES[t.tier] || t.tier;
+                        const tierDef = TIER_DEFS[t.tier] || {};
+                        const color = tierDef.color || '#6c757d';
+                        const primaryColor = '#696cff';
+                        const name = tierDef.name || t.tier;
                         $container.append(
                             '<div class="d-flex align-items-center mb-3">' +
                             '<span class="badge me-3" style="background:' + color + ';color:#fff;min-width:80px;">' + name + '</span>' +
                             '<div class="flex-grow-1"><div class="progress" style="height:20px;">' +
-                            '<div class="progress-bar" style="width:' + Math.max(5, (t.cnt / Math.max(1, d.total)) * 100) + '%;background:' + color + ';">' +
+                            '<div class="progress-bar" style="width:' + Math.max(5, (t.cnt / Math.max(1, d.total)) * 100) + '%;background:' + primaryColor + ';">' +
                             t.cnt + ' thành viên</div></div></div></div>'
                         );
                     });

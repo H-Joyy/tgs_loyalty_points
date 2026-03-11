@@ -2,7 +2,7 @@
 
 <div class="container-xxl flex-grow-1 container-p-y">
     <h4 class="fw-bold py-3 mb-4">
-        <span class="text-muted fw-light">Tích điểm /</span> Chi tiết chính sách
+        <span class="text-muted fw-light">Tích điểm /</span> Chi tiết chương trình
     </h4>
 
     <div class="row">
@@ -12,12 +12,12 @@
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Thông tin chung</h5>
-                    <span class="badge bg-secondary" id="policy-id-badge"></span>
+                    <span class="badge bg-primary" id="policy-id-badge"></span>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label">Mã chính sách <span class="text-danger">*</span></label>
+                            <label class="form-label">Mã chương trình <span class="text-primary">*</span></label>
                             <input type="text" id="policy-code" class="form-control">
                         </div>
                         <div class="col-md-4">
@@ -38,7 +38,7 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Tên chính sách <span class="text-danger">*</span></label>
+                            <label class="form-label">Tên chương trình <span class="text-primary">*</span></label>
                             <input type="text" id="policy-title" class="form-control">
                         </div>
                         <div class="col-md-4">
@@ -142,10 +142,10 @@
                     <button class="btn btn-primary" id="btn-update">
                         <i class="bx bx-save me-1"></i> Cập nhật
                     </button>
-                    <button class="btn btn-outline-warning" id="btn-clone">
+                    <button class="btn btn-outline-primary" id="btn-clone">
                         <i class="bx bx-copy me-1"></i> Sao chép
                     </button>
-                    <button class="btn btn-outline-danger" id="btn-delete">
+                    <button class="btn btn-outline-primary" id="btn-delete">
                         <i class="bx bx-trash me-1"></i> Xóa
                     </button>
                     <a href="<?php echo admin_url('admin.php?page=tgs-shop-management&view=loyalty-policies'); ?>"
@@ -163,7 +163,7 @@
         const params = new URLSearchParams(window.location.search);
         const policyId = parseInt(params.get('id')) || 0;
         if (!policyId) {
-            alert('Không tìm thấy ID chính sách.');
+            alert('Không tìm thấy ID chương trình.');
             return;
         }
 
@@ -178,7 +178,7 @@
                 '<input type="text" class="form-control rule-sku" value="' + (sku || '') + '"></div>' +
                 '<div class="col-md-4"><label class="form-label">Điểm / SP</label>' +
                 '<input type="number" class="form-control rule-points" value="' + (pts || 10) + '" min="0"></div>' +
-                '<div class="col-md-3"><button class="btn btn-sm btn-outline-danger btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>'
+                '<div class="col-md-3"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>'
             );
         }
 
@@ -189,7 +189,7 @@
                 '<input type="number" class="form-control rule-min-amount" value="' + (minAmt || 500000) + '" min="0"></div>' +
                 '<div class="col-md-4"><label class="form-label">Điểm bonus</label>' +
                 '<input type="number" class="form-control rule-bonus-points" value="' + (bonusPts || 100) + '" min="0"></div>' +
-                '<div class="col-md-3"><button class="btn btn-sm btn-outline-danger btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>'
+                '<div class="col-md-3"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>'
             );
         }
 
@@ -334,9 +334,9 @@
                         ajaxUrl: tgsLoyalty.ajaxUrl,
                         nonce: tgsLoyalty.nonce,
                         ajaxAction: 'tgs_loyalty_get_scope_data',
-                        onChange: function(data) {
-                            scopeBlogIds = data.blogIds || [];
-                            scopeOrgInfo = data.orgInfo || {};
+                        onChange: function(blogIds, orgInfo) {
+                            scopeBlogIds = blogIds || [];
+                            scopeOrgInfo = orgInfo || {};
                         }
                     });
                     setTimeout(function() {
@@ -350,8 +350,8 @@
         $('#btn-update').on('click', function() {
             const code = $('#policy-code').val().trim();
             const title = $('#policy-title').val().trim();
-            if (!code) return alert('Mã chính sách không được trống.');
-            if (!title) return alert('Tên chính sách không được trống.');
+            if (!code) return alert('Mã chương trình không được trống.');
+            if (!title) return alert('Tên chương trình không được trống.');
 
             const startDate = $('#policy-start').val();
             const endDate = $('#policy-end').val();
@@ -390,7 +390,7 @@
 
         // ── CLONE ──
         $('#btn-clone').on('click', function() {
-            if (!confirm('Sao chép chính sách này?')) return;
+            if (!confirm('Sao chép chương trình này?')) return;
             $.post(tgsLoyalty.ajaxUrl, {
                 action: 'tgs_loyalty_policy_clone',
                 nonce: tgsLoyalty.nonce,
@@ -407,7 +407,7 @@
 
         // ── DELETE ──
         $('#btn-delete').on('click', function() {
-            if (!confirm('Xóa chính sách này?')) return;
+            if (!confirm('Xóa chương trình này?')) return;
             $.post(tgsLoyalty.ajaxUrl, {
                 action: 'tgs_loyalty_policy_delete',
                 nonce: tgsLoyalty.nonce,

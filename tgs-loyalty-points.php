@@ -41,6 +41,7 @@ class TGS_Loyalty_Points_Plugin
         add_filter('tgs_shop_dashboard_routes', [$this, 'add_routes']);
         add_action('tgs_shop_sidebar_menu', [$this, 'add_sidebar']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+        add_action('user_register', [$this, 'on_user_register']);
         TGS_Loyalty_Ajax::init();
     }
 
@@ -53,16 +54,25 @@ class TGS_Loyalty_Points_Plugin
     }
 
     /**
+     * Tự động tạo ví khi đăng ký user mới.
+     */
+    public function on_user_register($user_id)
+    {
+        TGS_Loyalty_DB::ensure_wallet($user_id);
+    }
+
+    /**
      * Đăng ký routes vào dashboard tgs_shop_management.
      */
     public function add_routes($routes)
     {
         $dir = TGS_LOYALTY_PLUGIN_DIR . 'admin-views/';
-        $routes['loyalty-dashboard']    = ['Dashboard tích điểm', $dir . 'dashboard.php'];
-        $routes['loyalty-policies']     = ['Chính sách tích điểm', $dir . 'list.php'];
-        $routes['loyalty-policy-add']   = ['Thêm chính sách tích điểm', $dir . 'add.php'];
-        $routes['loyalty-policy-detail'] = ['Chi tiết chính sách tích điểm', $dir . 'detail.php'];
-        $routes['loyalty-members']      = ['Thành viên tích điểm', $dir . 'members.php'];
+        $routes['loyalty-dashboard']    = ['Tổng quan tích điểm', $dir . 'dashboard.php'];
+        $routes['loyalty-policies']     = ['Chương trình tích điểm', $dir . 'list.php'];
+        $routes['loyalty-policy-add']   = ['Thêm chương trình', $dir . 'add.php'];
+        $routes['loyalty-policy-detail'] = ['Chi tiết chương trình', $dir . 'detail.php'];
+        $routes['loyalty-members']      = ['Thành viên', $dir . 'members.php'];
+        $routes['loyalty-settings']     = ['Cài đặt tích điểm', $dir . 'settings.php'];
         return $routes;
     }
 
@@ -77,6 +87,7 @@ class TGS_Loyalty_Points_Plugin
             'loyalty-policy-add',
             'loyalty-policy-detail',
             'loyalty-members',
+            'loyalty-settings',
         ];
         $is_active = in_array($current_view, $views);
 ?>
@@ -95,13 +106,19 @@ class TGS_Loyalty_Points_Plugin
                 <li class="menu-item <?php echo in_array($current_view, ['loyalty-policies', 'loyalty-policy-add', 'loyalty-policy-detail']) ? 'active' : ''; ?>">
                     <a href="<?php echo admin_url('admin.php?page=tgs-shop-management&view=loyalty-policies'); ?>" class="menu-link">
                         <i class="bx bx-star me-1"></i>
-                        <div>Chính sách tích điểm</div>
+                        <div>Chương trình</div>
                     </a>
                 </li>
                 <li class="menu-item <?php echo $current_view === 'loyalty-members' ? 'active' : ''; ?>">
                     <a href="<?php echo admin_url('admin.php?page=tgs-shop-management&view=loyalty-members'); ?>" class="menu-link">
                         <i class="bx bx-group me-1"></i>
                         <div>Thành viên</div>
+                    </a>
+                </li>
+                <li class="menu-item <?php echo $current_view === 'loyalty-settings' ? 'active' : ''; ?>">
+                    <a href="<?php echo admin_url('admin.php?page=tgs-shop-management&view=loyalty-settings'); ?>" class="menu-link">
+                        <i class="bx bx-cog me-1"></i>
+                        <div>Cài đặt</div>
                     </a>
                 </li>
             </ul>
@@ -127,9 +144,15 @@ class TGS_Loyalty_Points_Plugin
         ]);
 
         // Scope Selector (shared from tgs_selling_policy)
-        if (defined('TGS_SELLING_PLUGIN_URL')) {
-            wp_enqueue_style('tgs-scope-selector-css', TGS_SELLING_PLUGIN_URL . 'assets/css/scope-selector.css', [], TGS_LOYALTY_VERSION);
-            wp_enqueue_script('tgs-scope-selector-js', TGS_SELLING_PLUGIN_URL . 'assets/js/scope-selector.js', ['jquery', 'tgs-loyalty-js'], TGS_LOYALTY_VERSION, true);
+        if (defined('TGS_SELLING_PLUGIN_URL') && defined('TGS_SELLING_PLUGIN_DIR')) {
+            $scope_css_ver = file_exists(TGS_SELLING_PLUGIN_DIR . 'assets/css/scope-selector.css')
+                ? filemtime(TGS_SELLING_PLUGIN_DIR . 'assets/css/scope-selector.css')
+                : TGS_LOYALTY_VERSION;
+            $scope_js_ver = file_exists(TGS_SELLING_PLUGIN_DIR . 'assets/js/scope-selector.js')
+                ? filemtime(TGS_SELLING_PLUGIN_DIR . 'assets/js/scope-selector.js')
+                : TGS_LOYALTY_VERSION;
+            wp_enqueue_style('tgs-scope-selector-css', TGS_SELLING_PLUGIN_URL . 'assets/css/scope-selector.css', [], $scope_css_ver);
+            wp_enqueue_script('tgs-scope-selector-js', TGS_SELLING_PLUGIN_URL . 'assets/js/scope-selector.js', ['jquery', 'tgs-loyalty-js'], $scope_js_ver, true);
         }
     }
 }
@@ -148,3 +171,71 @@ function tgs_loyalty_points_init()
     TGS_Loyalty_Points_Plugin::get_instance();
 }
 add_action('plugins_loaded', 'tgs_loyalty_points_init', 20);
+
+/* ================================================================
+ *  Backward-compatible user_wallet_* wrappers
+ *  — POS và các plugin cũ vẫn gọi được
+ * ================================================================ */
+
+if (!function_exists('tgs_loyalty_is_legacy_wallet_plugin_active')) {
+    function tgs_loyalty_is_legacy_wallet_plugin_active()
+    {
+        $plugin_file = 'tgs_user_wallet/user-wallet.php';
+        $active_plugins = (array) get_option('active_plugins', []);
+
+        if (in_array($plugin_file, $active_plugins, true)) {
+            return true;
+        }
+
+        if (is_multisite()) {
+            $sitewide_plugins = (array) get_site_option('active_sitewide_plugins', []);
+            if (isset($sitewide_plugins[$plugin_file])) {
+                return true;
+            }
+        }
+
+        return defined('USER_WALLET_PLUGIN_BASENAME') || class_exists('User_Wallet_Plugin', false);
+    }
+}
+
+if (!tgs_loyalty_is_legacy_wallet_plugin_active() && !function_exists('user_wallet_get_balance')) {
+    function user_wallet_get_balance($user_id)
+    {
+        if (!class_exists('TGS_Loyalty_DB')) return 0;
+        return TGS_Loyalty_DB::get_balance($user_id);
+    }
+}
+
+if (!tgs_loyalty_is_legacy_wallet_plugin_active() && !function_exists('user_wallet_add_balance')) {
+    function user_wallet_add_balance($user_id, $amount, $description = '', $args = [])
+    {
+        if (!class_exists('TGS_Loyalty_DB')) return new WP_Error('not_loaded', 'Loyalty chưa sẵn sàng.');
+        TGS_Loyalty_DB::ensure_wallet($user_id);
+        return TGS_Loyalty_DB::add_balance($user_id, $amount, $description, $args);
+    }
+}
+
+if (!tgs_loyalty_is_legacy_wallet_plugin_active() && !function_exists('user_wallet_deduct_balance')) {
+    function user_wallet_deduct_balance($user_id, $amount, $description = '', $args = [])
+    {
+        if (!class_exists('TGS_Loyalty_DB')) return new WP_Error('not_loaded', 'Loyalty chưa sẵn sàng.');
+        return TGS_Loyalty_DB::deduct_balance($user_id, $amount, $description, $args);
+    }
+}
+
+if (!tgs_loyalty_is_legacy_wallet_plugin_active() && !function_exists('user_wallet_get_tier')) {
+    function user_wallet_get_tier($user_id)
+    {
+        if (!class_exists('TGS_Loyalty_DB')) return 'member';
+        $total = TGS_Loyalty_DB::get_total_earned($user_id);
+        return TGS_Loyalty_DB::determine_tier($total);
+    }
+}
+
+if (!tgs_loyalty_is_legacy_wallet_plugin_active() && !function_exists('user_wallet_get_available_tiers')) {
+    function user_wallet_get_available_tiers()
+    {
+        if (!class_exists('TGS_Loyalty_DB')) return [];
+        return TGS_Loyalty_DB::get_tier_definitions();
+    }
+}

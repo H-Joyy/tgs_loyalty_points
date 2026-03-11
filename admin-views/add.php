@@ -2,7 +2,7 @@
 
 <div class="container-xxl flex-grow-1 container-p-y">
     <h4 class="fw-bold py-3 mb-4">
-        <span class="text-muted fw-light">Tích điểm /</span> Thêm chính sách tích điểm
+        <span class="text-muted fw-light">Tích điểm /</span> Thêm chương trình
     </h4>
 
     <div class="row">
@@ -16,11 +16,11 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label">Mã chính sách <span class="text-danger">*</span></label>
+                            <label class="form-label">Mã chương trình <span class="text-primary">*</span></label>
                             <input type="text" id="policy-code" class="form-control" placeholder="VD: TD-2026-001">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Loại <span class="text-danger">*</span></label>
+                            <label class="form-label">Loại <span class="text-primary">*</span></label>
                             <select id="policy-type" class="form-select">
                                 <option value="1">1 — Tích theo số tiền</option>
                                 <option value="2">2 — Tích theo sản phẩm</option>
@@ -36,7 +36,7 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Tên chính sách <span class="text-danger">*</span></label>
+                            <label class="form-label">Tên chương trình <span class="text-primary">*</span></label>
                             <input type="text" id="policy-title" class="form-control" placeholder="VD: Tích 1 điểm mỗi 1.000₫">
                         </div>
                         <div class="col-md-4">
@@ -124,7 +124,7 @@
             <div class="card mb-4">
                 <div class="card-body d-grid gap-2">
                     <button class="btn btn-primary" id="btn-save">
-                        <i class="bx bx-save me-1"></i> Lưu chính sách
+                        <i class="bx bx-save me-1"></i> Lưu chương trình
                     </button>
                     <a href="<?php echo admin_url('admin.php?page=tgs-shop-management&view=loyalty-policies'); ?>"
                         class="btn btn-outline-secondary">
@@ -199,7 +199,7 @@
                 '<input type="text" class="form-control rule-sku" placeholder="Mã SKU"></div>' +
                 '<div class="col-md-4"><label class="form-label">Điểm / SP</label>' +
                 '<input type="number" class="form-control rule-points" value="10" min="0"></div>' +
-                '<div class="col-md-3"><button class="btn btn-sm btn-outline-danger btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div>' +
+                '<div class="col-md-3"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div>' +
                 '</div>'
             );
         }
@@ -211,7 +211,7 @@
                 '<input type="number" class="form-control rule-min-amount" value="500000" min="0"></div>' +
                 '<div class="col-md-4"><label class="form-label">Điểm bonus</label>' +
                 '<input type="number" class="form-control rule-bonus-points" value="100" min="0"></div>' +
-                '<div class="col-md-3"><button class="btn btn-sm btn-outline-danger btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div>' +
+                '<div class="col-md-3"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div>' +
                 '</div>'
             );
         }
@@ -279,9 +279,9 @@
                 ajaxUrl: tgsLoyalty.ajaxUrl,
                 nonce: tgsLoyalty.nonce,
                 ajaxAction: 'tgs_loyalty_get_scope_data',
-                onChange: function(data) {
-                    scopeBlogIds = data.blogIds || [];
-                    scopeOrgInfo = data.orgInfo || {};
+                onChange: function(blogIds, orgInfo) {
+                    scopeBlogIds = blogIds || [];
+                    scopeOrgInfo = orgInfo || {};
                 }
             });
         }
@@ -290,8 +290,8 @@
         $('#btn-save').on('click', function() {
             const code = $('#policy-code').val().trim();
             const title = $('#policy-title').val().trim();
-            if (!code) return alert('Vui lòng nhập mã chính sách.');
-            if (!title) return alert('Vui lòng nhập tên chính sách.');
+            if (!code) return alert('Vui lòng nhập mã chương trình.');
+            if (!title) return alert('Vui lòng nhập tên chương trình.');
 
             const startDate = $('#policy-start').val();
             const endDate = $('#policy-end').val();
@@ -322,7 +322,7 @@
             const $btn = $(this).prop('disabled', true).html('<i class="bx bx-loader-alt bx-spin me-1"></i> Đang lưu...');
 
             $.post(tgsLoyalty.ajaxUrl, payload, function(res) {
-                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Lưu chính sách');
+                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Lưu chương trình');
                 if (res.success) {
                     alert(res.data.message);
                     window.location.href = '<?php echo admin_url("admin.php?page=tgs-shop-management&view=loyalty-policy-detail"); ?>&id=' + res.data.loyalty_policy_id;
@@ -330,7 +330,7 @@
                     alert(res.data?.message || 'Có lỗi xảy ra.');
                 }
             }).fail(function() {
-                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Lưu chính sách');
+                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Lưu chương trình');
                 alert('Lỗi kết nối.');
             });
         });

@@ -21,6 +21,10 @@ class TGS_Loyalty_Ajax
         add_action('wp_ajax_tgs_loyalty_policy_clone',  [__CLASS__, 'policy_clone']);
         add_action('wp_ajax_tgs_loyalty_policy_stats',  [__CLASS__, 'policy_stats']);
 
+        // ── Settings ──
+        add_action('wp_ajax_tgs_loyalty_settings_get',  [__CLASS__, 'settings_get']);
+        add_action('wp_ajax_tgs_loyalty_settings_save', [__CLASS__, 'settings_save']);
+
         // ── Member ──
         add_action('wp_ajax_tgs_loyalty_member_list',   [__CLASS__, 'member_list']);
         add_action('wp_ajax_tgs_loyalty_member_adjust', [__CLASS__, 'member_adjust']);
@@ -58,7 +62,7 @@ class TGS_Loyalty_Ajax
         if (!$id) wp_send_json_error(['message' => 'Thiếu ID.']);
 
         $policy = TGS_Loyalty_DB::get_policy($id);
-        if (!$policy) wp_send_json_error(['message' => 'Không tìm thấy chính sách.']);
+        if (!$policy) wp_send_json_error(['message' => 'Không tìm thấy chương trình.']);
 
         // Giải nén loyalty_rules để JS dùng trực tiếp
         $policy->parsed_rules = TGS_Loyalty_DB::parse_rules($policy);
@@ -105,20 +109,22 @@ class TGS_Loyalty_Ajax
         ];
 
         if (empty($data['loyalty_policy_code'])) {
-            wp_send_json_error(['message' => 'Mã chính sách không được trống.']);
+            wp_send_json_error(['message' => 'Mã chương trình không được trống.']);
         }
         if (empty($data['loyalty_policy_title'])) {
-            wp_send_json_error(['message' => 'Tên chính sách không được trống.']);
+            wp_send_json_error(['message' => 'Tên chương trình không được trống.']);
         }
 
         $saved_id = TGS_Loyalty_DB::save_policy($data, $id);
 
         if (!$saved_id) {
-            wp_send_json_error(['message' => 'Lỗi lưu chính sách.']);
+            global $wpdb;
+            $db_error = $wpdb->last_error;
+            wp_send_json_error(['message' => 'Không thể lưu.' . ($db_error ? ' DB: ' . $db_error : '')]);
         }
 
         wp_send_json_success([
-            'message'           => $id ? 'Đã cập nhật chính sách.' : 'Đã tạo chính sách mới.',
+            'message'           => $id ? 'Đã cập nhật.' : 'Đã tạo chương trình mới.',
             'loyalty_policy_id' => $saved_id,
         ]);
     }
@@ -131,7 +137,7 @@ class TGS_Loyalty_Ajax
         if (!$id) wp_send_json_error(['message' => 'Thiếu ID.']);
 
         TGS_Loyalty_DB::delete_policy($id);
-        wp_send_json_success(['message' => 'Đã xóa chính sách.']);
+        wp_send_json_success(['message' => 'Đã xóa.']);
     }
 
     public static function policy_clone()
@@ -145,7 +151,7 @@ class TGS_Loyalty_Ajax
         if (!$new_id) wp_send_json_error(['message' => 'Không thể sao chép.']);
 
         wp_send_json_success([
-            'message'           => 'Đã sao chép chính sách.',
+            'message'           => 'Đã sao chép.',
             'loyalty_policy_id' => $new_id,
         ]);
     }
@@ -154,6 +160,36 @@ class TGS_Loyalty_Ajax
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
         wp_send_json_success(TGS_Loyalty_DB::get_policy_stats());
+    }
+
+    public static function settings_get()
+    {
+        check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+        wp_send_json_success(TGS_Loyalty_DB::get_settings());
+    }
+
+    public static function settings_save()
+    {
+        check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+
+        $tiers = json_decode(wp_unslash($_POST['tiers'] ?? '[]'), true);
+        if (!is_array($tiers)) {
+            $tiers = [];
+        }
+
+        $result = TGS_Loyalty_DB::save_settings([
+            'enable_pos_earn'     => intval($_POST['enable_pos_earn'] ?? 0),
+            'enable_pos_redeem'   => intval($_POST['enable_pos_redeem'] ?? 0),
+            'allow_manual_adjust' => intval($_POST['allow_manual_adjust'] ?? 0),
+            'point_label'         => sanitize_text_field($_POST['point_label'] ?? 'điểm'),
+            'min_redeem_points'   => floatval($_POST['min_redeem_points'] ?? 0),
+            'tiers'               => $tiers,
+        ]);
+
+        wp_send_json_success([
+            'message'  => 'Đã lưu cài đặt loyalty.',
+            'settings' => $result['settings'],
+        ]);
     }
 
     /* ================================================================
@@ -194,27 +230,27 @@ class TGS_Loyalty_Ajax
             wp_send_json_error(['message' => 'Thông tin không hợp lệ.']);
         }
 
+        $settings = TGS_Loyalty_DB::get_settings();
+        if (empty($settings['allow_manual_adjust'])) {
+            wp_send_json_error(['message' => 'Chức năng điều chỉnh thủ công đang bị tắt trong cài đặt loyalty.']);
+        }
+
         if ($action === 'deduct') {
             $result = tgs_loyalty_redeem_points($wp_user_id, $points, [
                 'description'    => $description ?: 'Trừ điểm thủ công',
                 'reference_type' => 'manual',
             ]);
         } else {
-            // Cộng điểm thủ công — dùng trực tiếp wallet + log (không qua policy)
+            // Cộng điểm thủ công — dùng trực tiếp TGS_Loyalty_DB
             $info = tgs_loyalty_get_member_info($wp_user_id);
             $balance_before = $info ? $info['current_points'] : 0;
 
-            // Wallet bridge
-            if (function_exists('user_wallet_add_balance')) {
-                $wallet_result = user_wallet_add_balance($wp_user_id, $points, $description ?: 'Cộng điểm thủ công', [
-                    'reference_type' => 'loyalty_manual',
-                ]);
-                if (is_wp_error($wallet_result)) {
-                    wp_send_json_error(['message' => $wallet_result->get_error_message()]);
-                }
-            } else {
-                $bal = floatval(get_user_meta($wp_user_id, 'loyalty_balance', true));
-                update_user_meta($wp_user_id, 'loyalty_balance', $bal + $points);
+            TGS_Loyalty_DB::ensure_wallet($wp_user_id);
+            $wallet_result = TGS_Loyalty_DB::add_balance($wp_user_id, $points, $description ?: 'Cộng điểm bằng tay', [
+                'reference_type' => 'loyalty_manual',
+            ]);
+            if (is_wp_error($wallet_result)) {
+                wp_send_json_error(['message' => $wallet_result->get_error_message()]);
             }
 
             $info_after = tgs_loyalty_get_member_info($wp_user_id);
@@ -231,7 +267,7 @@ class TGS_Loyalty_Ajax
                 'points'         => $points,
                 'points_before'  => $balance_before,
                 'points_after'   => $balance_after,
-                'description'    => $description ?: 'Cộng điểm thủ công',
+                'description'    => $description ?: 'Cộng điểm bằng tay',
                 'reference_type' => 'manual',
                 'created_by'     => get_current_user_id(),
                 'blog_id'        => get_current_blog_id(),
@@ -283,26 +319,115 @@ class TGS_Loyalty_Ajax
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
 
-        if (class_exists('TGS_Selling_Policy_Ajax') && method_exists('TGS_Selling_Policy_Ajax', 'get_scope_data')) {
-            $_POST['nonce'] = wp_create_nonce('tgs_selling_nonce');
-            TGS_Selling_Policy_Ajax::get_scope_data();
+        if (!class_exists('TGS_Org_Chart_Data')) {
+            wp_send_json_error('Plugin TGS Multisite Hierarchy chưa được kích hoạt.');
             return;
         }
 
+        $org_data = TGS_Org_Chart_Data::get_all_data();
+        $tree = self::build_scope_tree($org_data);
+
+        $websites = [];
         if (is_multisite()) {
-            $sites = get_sites(['number' => 200]);
-            $websites = [];
-            foreach ($sites as $s) {
-                $details = get_blog_details($s->blog_id);
-                $websites[] = [
-                    'blog_id' => intval($s->blog_id),
-                    'name'    => $details->blogname ?? 'Site #' . $s->blog_id,
-                    'domain'  => $s->domain . $s->path,
+            $sites = get_sites([
+                'number'  => 9999,
+                'orderby' => 'blog_id',
+                'order'   => 'ASC',
+            ]);
+
+            foreach ($sites as $site) {
+                switch_to_blog($site->blog_id);
+                $websites[(int) $site->blog_id] = [
+                    'blog_id' => (int) $site->blog_id,
+                    'name'    => get_bloginfo('name'),
+                    'domain'  => $site->domain,
+                    'path'    => $site->path,
                 ];
+                restore_current_blog();
             }
-            wp_send_json_success(['websites' => $websites, 'tree' => null]);
-        } else {
-            wp_send_json_success(['websites' => [], 'tree' => null]);
         }
+
+        wp_send_json_success([
+            'tree'     => $tree,
+            'websites' => $websites,
+        ]);
+    }
+
+    private static function build_scope_tree($data)
+    {
+        $node_shops = isset($data['node_shops']) ? $data['node_shops'] : [];
+        if (isset($data['province_shops'])) {
+            foreach ($data['province_shops'] as $province_id => $shop_ids) {
+                if (!isset($node_shops[$province_id])) {
+                    $node_shops[$province_id] = $shop_ids;
+                }
+            }
+        }
+
+        $company = isset($data['company']) ? $data['company'] : null;
+        if (!$company) {
+            return null;
+        }
+
+        $company_id = $company['id'];
+        $tree = [
+            'id'       => $company_id,
+            'name'     => $company['name'],
+            'code'     => $company['code'] ?? '',
+            'level'    => 1,
+            'shop_ids' => isset($node_shops[$company_id]) ? array_map('intval', $node_shops[$company_id]) : [],
+            'children' => [],
+        ];
+
+        $regions = $data['regions'] ?? [];
+        $branches = $data['branches'] ?? [];
+        $provinces = $data['provinces'] ?? [];
+
+        uasort($regions, fn($left, $right) => ($left['order'] ?? 0) - ($right['order'] ?? 0));
+
+        foreach ($regions as $region_id => $region) {
+            $region_node = [
+                'id'       => $region_id,
+                'name'     => $region['name'],
+                'code'     => $region['code'] ?? '',
+                'level'    => 2,
+                'shop_ids' => isset($node_shops[$region_id]) ? array_map('intval', $node_shops[$region_id]) : [],
+                'children' => [],
+            ];
+
+            $region_branches = array_filter($branches, fn($branch) => $branch['region_id'] === $region_id);
+            uasort($region_branches, fn($left, $right) => ($left['order'] ?? 0) - ($right['order'] ?? 0));
+
+            foreach ($region_branches as $branch_id => $branch) {
+                $branch_node = [
+                    'id'       => $branch_id,
+                    'name'     => $branch['name'],
+                    'code'     => $branch['code'] ?? '',
+                    'level'    => 3,
+                    'shop_ids' => isset($node_shops[$branch_id]) ? array_map('intval', $node_shops[$branch_id]) : [],
+                    'children' => [],
+                ];
+
+                $branch_provinces = array_filter($provinces, fn($province) => $province['branch_id'] === $branch_id);
+                uasort($branch_provinces, fn($left, $right) => ($left['order'] ?? 0) - ($right['order'] ?? 0));
+
+                foreach ($branch_provinces as $province_id => $province) {
+                    $branch_node['children'][] = [
+                        'id'       => $province_id,
+                        'name'     => $province['name'],
+                        'code'     => $province['code'] ?? '',
+                        'level'    => 4,
+                        'shop_ids' => isset($node_shops[$province_id]) ? array_map('intval', $node_shops[$province_id]) : [],
+                        'children' => [],
+                    ];
+                }
+
+                $region_node['children'][] = $branch_node;
+            }
+
+            $tree['children'][] = $region_node;
+        }
+
+        return $tree;
     }
 }

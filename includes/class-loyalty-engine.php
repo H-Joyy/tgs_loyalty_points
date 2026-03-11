@@ -3,19 +3,9 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * TGS_Loyalty_Engine — Runtime engine tích điểm, tích hợp với tgs_user_wallet.
+ * TGS_Loyalty_Engine — Xử lý tích điểm, đổi điểm, tính hạng.
  *
- * Kiến trúc:
- *   - wp_user_id (WP user ID) là khóa duy nhất liên kết tất cả plugin
- *   - Tích điểm → gọi wallet API cộng balance + ghi loyalty log
- *   - Đổi điểm → gọi wallet API trừ balance + ghi loyalty log
- *   - Tier → lưu wp_usermeta 'loyalty_tier', sync từ wallet total_earned
- *
- * Global helpers:
- *   tgs_loyalty_calculate_earn_points( $context )
- *   tgs_loyalty_earn_points( $wp_user_id, $order_total, $context )
- *   tgs_loyalty_redeem_points( $wp_user_id, $points, $context )
- *   tgs_loyalty_get_member_info( $wp_user_id )
+ * Gọi TGS_Loyalty_DB trực tiếp cho ví & balance (đã gộp wallet).
  */
 
 // =========================================================================
@@ -64,6 +54,7 @@ class TGS_Loyalty_Engine
         $order_total = floatval($context['order_total'] ?? 0);
         $wp_user_id  = intval($context['wp_user_id'] ?? 0);
         $cart_items  = $context['cart_items'] ?? [];
+        $settings    = TGS_Loyalty_DB::get_settings();
 
         $policies = self::get_active_policies($store_id);
         if (empty($policies)) {
@@ -72,7 +63,7 @@ class TGS_Loyalty_Engine
 
         // Hệ số nhân tier
         $multiplier = 1.0;
-        if ($wp_user_id) {
+        if (!empty($settings['enable_tier_multiplier']) && $wp_user_id) {
             $tier_key = get_user_meta($wp_user_id, 'loyalty_tier', true) ?: TGS_Loyalty_DB::get_default_tier_key();
             $tiers = TGS_Loyalty_DB::get_tier_definitions();
             if (isset($tiers[$tier_key])) {
@@ -194,6 +185,12 @@ class TGS_Loyalty_Engine
             return ['success' => false, 'message' => 'Thông tin không hợp lệ.'];
         }
 
+        $settings = TGS_Loyalty_DB::get_settings();
+        $min_redeem_points = floatval($settings['min_redeem_points'] ?? 0);
+        if ($min_redeem_points > 0 && $points < $min_redeem_points) {
+            return ['success' => false, 'message' => 'Số điểm đổi tối thiểu là ' . number_format($min_redeem_points) . '.'];
+        }
+
         $balance_before = self::get_user_balance($wp_user_id);
         if ($balance_before < $points) {
             return ['success' => false, 'message' => 'Không đủ điểm. Hiện có: ' . number_format($balance_before)];
@@ -290,56 +287,28 @@ class TGS_Loyalty_Engine
     }
 
     /* ================================================================
-     *  WALLET BRIDGE — gọi tgs_user_wallet nếu có, fallback usermeta
+     *  VÍ ĐIỂM — gọi TGS_Loyalty_DB trực tiếp (đã gộp wallet)
      * ================================================================ */
 
     private static function get_user_balance($wp_user_id)
     {
-        if (function_exists('user_wallet_get_balance')) {
-            return floatval(user_wallet_get_balance($wp_user_id));
-        }
-        // Fallback: lấy từ usermeta
-        return floatval(get_user_meta($wp_user_id, 'loyalty_balance', true));
+        return TGS_Loyalty_DB::get_balance($wp_user_id);
     }
 
     private static function get_user_total_earned($wp_user_id)
     {
-        if (class_exists('User_Wallet_DB')) {
-            $wallet = User_Wallet_DB::get_instance()->get_wallet_by_user($wp_user_id);
-            if ($wallet) return floatval($wallet->total_earned);
-        }
-        // Fallback: tính từ loyalty log
-        global $wpdb;
-        $table = $wpdb->prefix . TGS_Loyalty_DB::TABLE_LOG;
-        return floatval($wpdb->get_var($wpdb->prepare(
-            "SELECT COALESCE(SUM(CASE WHEN points > 0 THEN points ELSE 0 END), 0) FROM {$table} WHERE wp_user_id = %d",
-            $wp_user_id
-        )));
+        return TGS_Loyalty_DB::get_total_earned($wp_user_id);
     }
 
     private static function wallet_add_balance($wp_user_id, $amount, $description, $args = [])
     {
-        if (function_exists('user_wallet_add_balance')) {
-            return user_wallet_add_balance($wp_user_id, $amount, $description, $args);
-        }
-        // Fallback: usermeta
-        $current = floatval(get_user_meta($wp_user_id, 'loyalty_balance', true));
-        update_user_meta($wp_user_id, 'loyalty_balance', $current + $amount);
-        return true;
+        TGS_Loyalty_DB::ensure_wallet($wp_user_id);
+        return TGS_Loyalty_DB::add_balance($wp_user_id, $amount, $description, $args);
     }
 
     private static function wallet_deduct_balance($wp_user_id, $amount, $description, $args = [])
     {
-        if (function_exists('user_wallet_deduct_balance')) {
-            return user_wallet_deduct_balance($wp_user_id, $amount, $description, $args);
-        }
-        // Fallback: usermeta
-        $current = floatval(get_user_meta($wp_user_id, 'loyalty_balance', true));
-        if ($current < $amount) {
-            return new WP_Error('insufficient_balance', 'Không đủ điểm.');
-        }
-        update_user_meta($wp_user_id, 'loyalty_balance', $current - $amount);
-        return true;
+        return TGS_Loyalty_DB::deduct_balance($wp_user_id, $amount, $description, $args);
     }
 
     /* ================================================================

@@ -30,109 +30,14 @@ class TGS_Loyalty_DB
     const TABLE_LOG    = 'global_loyalty_log';
 
     /* ================================================================
-     *  TẠO BẢNG
+     *  TẠO BẢNG — Đã chuyển sang TGS_Shop_Database::create_global_tables()
+     *  Plugin tgs_shop_management tạo tất cả bảng khi kích hoạt.
+     *  Giữ method stub để tương thích ngược (nếu có nơi nào gọi).
      * ================================================================ */
 
     public static function create_tables()
     {
-        global $wpdb;
-        $charset = $wpdb->get_charset_collate();
-
-        $policy_table = $wpdb->prefix . self::TABLE_POLICY;
-        $log_table    = $wpdb->prefix . self::TABLE_LOG;
-        $wallet_table = $wpdb->base_prefix . 'wallet';
-        $wallet_log   = $wpdb->base_prefix . 'wallet_log';
-
-        $sqls = [];
-
-        $sqls[] = "CREATE TABLE IF NOT EXISTS {$policy_table} (
-            loyalty_policy_id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            loyalty_policy_code       VARCHAR(50) NOT NULL,
-            loyalty_policy_title      VARCHAR(255) NOT NULL,
-            loyalty_policy_type       TINYINT UNSIGNED NOT NULL DEFAULT 1,
-            loyalty_rules             JSON NULL,
-            apply_to_blog_ids         JSON NULL,
-            apply_to_org_level        JSON NULL,
-            auto_apply                TINYINT(1) NOT NULL DEFAULT 1,
-            loyalty_policy_priority   SMALLINT NOT NULL DEFAULT 0,
-            loyalty_policy_start_date BIGINT UNSIGNED NOT NULL DEFAULT 0,
-            loyalty_policy_end_date   BIGINT UNSIGNED NOT NULL DEFAULT 0,
-            loyalty_policy_status     TINYINT NOT NULL DEFAULT 0,
-            is_deleted                TINYINT(1) NOT NULL DEFAULT 0,
-            user_id                   BIGINT UNSIGNED NULL,
-            source_blog_id            BIGINT UNSIGNED NULL,
-            created_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uk_code (loyalty_policy_code),
-            INDEX idx_status (loyalty_policy_status),
-            INDEX idx_type (loyalty_policy_type),
-            INDEX idx_priority (loyalty_policy_priority)
-        ) {$charset};";
-
-        $sqls[] = "CREATE TABLE IF NOT EXISTS {$log_table} (
-            loyalty_log_id  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            wp_user_id      BIGINT UNSIGNED NOT NULL,
-            log_type        VARCHAR(20) NOT NULL,
-            points          DECIMAL(15,2) NOT NULL,
-            points_before   DECIMAL(15,2) NOT NULL DEFAULT 0,
-            points_after    DECIMAL(15,2) NOT NULL DEFAULT 0,
-            description     TEXT NULL,
-            reference_id    VARCHAR(100) NULL,
-            reference_type  VARCHAR(50) NULL,
-            policy_id       BIGINT UNSIGNED NULL,
-            log_meta        JSON NULL,
-            created_by      BIGINT UNSIGNED NULL,
-            blog_id         BIGINT UNSIGNED NULL,
-            created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_user (wp_user_id),
-            INDEX idx_type (log_type),
-            INDEX idx_ref (reference_id, reference_type),
-            INDEX idx_created (created_at)
-        ) {$charset};";
-
-        $sqls[] = "CREATE TABLE IF NOT EXISTS {$wallet_table} (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            user_id BIGINT UNSIGNED NOT NULL UNIQUE,
-            balance DECIMAL(15,2) NOT NULL DEFAULT 0,
-            wallet_key VARCHAR(50) NOT NULL UNIQUE,
-            status VARCHAR(20) NOT NULL DEFAULT 'active',
-            wallet_type VARCHAR(20) NOT NULL DEFAULT 'standard',
-            total_earned DECIMAL(15,2) DEFAULT 0,
-            total_spent DECIMAL(15,2) DEFAULT 0,
-            transaction_count INT DEFAULT 0,
-            last_transaction_at DATETIME NULL,
-            wallet_meta JSON NULL,
-            created_at DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL,
-            INDEX idx_user_id (user_id),
-            INDEX idx_wallet_key (wallet_key),
-            INDEX idx_status (status)
-        ) {$charset};";
-
-        $sqls[] = "CREATE TABLE IF NOT EXISTS {$wallet_log} (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            wallet_id BIGINT UNSIGNED NOT NULL,
-            user_id BIGINT UNSIGNED NOT NULL,
-            transaction_type VARCHAR(20) NOT NULL,
-            amount DECIMAL(15,2) NOT NULL,
-            wallet_log_meta JSON NULL,
-            reference_id VARCHAR(100) NULL,
-            reference_type VARCHAR(50) NULL,
-            ip_address VARCHAR(45) NULL,
-            user_agent TEXT NULL,
-            created_by BIGINT UNSIGNED NULL,
-            created_at DATETIME NOT NULL,
-            INDEX idx_wallet_id (wallet_id),
-            INDEX idx_user_id (user_id),
-            INDEX idx_transaction_type (transaction_type),
-            INDEX idx_reference (reference_id, reference_type),
-            INDEX idx_created_at (created_at)
-        ) {$charset};";
-
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        foreach ($sqls as $sql) {
-            dbDelta($sql);
-        }
+        // Bảng được tạo bởi tgs_shop_management — không làm gì ở đây.
     }
 
     /* ================================================================
@@ -387,11 +292,6 @@ class TGS_Loyalty_DB
     {
         global $wpdb;
         $table = $wpdb->prefix . self::TABLE_POLICY;
-
-        // Đảm bảo bảng tồn tại
-        if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
-            self::create_tables();
-        }
 
         if ($id > 0) {
             $data['updated_at'] = current_time('mysql');

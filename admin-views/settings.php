@@ -46,7 +46,7 @@
                     <div class="form-check form-switch mt-3 mb-0">
                         <input class="form-check-input" type="checkbox" id="enable-tier-multiplier" <?php checked(!empty($settings['enable_tier_multiplier'])); ?>>
                         <label class="form-check-label" for="enable-tier-multiplier">Nhân điểm theo hạng thành viên</label>
-                        <div class="form-text">Nếu tắt, chính sách 1 điểm / 1.000đ sẽ cộng đúng theo cấu hình, không tự nhân thêm theo hạng Bạc/Vàng/VIP.</div>
+                        <div class="form-text">Nếu tắt, chính sách sẽ cộng đúng theo cấu hình, không tự nhân theo Hạng thành viên.</div>
                     </div>
                 </div>
             </div>

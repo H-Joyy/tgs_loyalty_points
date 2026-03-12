@@ -46,11 +46,11 @@ class TGS_Loyalty_Points_Plugin
     }
 
     /**
-     * Tạo bảng DB khi kích hoạt plugin.
+     * Kích hoạt plugin — bảng DB được tạo bởi tgs_shop_management.
      */
     public function activate()
     {
-        TGS_Loyalty_DB::create_tables();
+        // Bảng loyalty/wallet đã được tạo bởi TGS_Shop_Database::create_global_tables()
     }
 
     /**

@@ -209,13 +209,12 @@
                     d.by_tier.forEach(function(t) {
                         const tierDef = TIER_DEFS[t.tier] || {};
                         const color = tierDef.color || '#6c757d';
-                        const primaryColor = '#696cff';
                         const name = tierDef.name || t.tier;
                         $container.append(
                             '<div class="d-flex align-items-center mb-3">' +
                             '<span class="badge me-3" style="background:' + color + ';color:#fff;min-width:80px;">' + name + '</span>' +
                             '<div class="flex-grow-1"><div class="progress" style="height:20px;">' +
-                            '<div class="progress-bar" style="width:' + Math.max(5, (t.cnt / Math.max(1, d.total)) * 100) + '%;background:' + primaryColor + ';">' +
+                            '<div class="progress-bar" style="width:' + Math.max(5, (t.cnt / Math.max(1, d.total)) * 100) + '%;background:' + color + ';">' +
                             t.cnt + ' thành viên</div></div></div></div>'
                         );
                     });

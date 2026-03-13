@@ -151,6 +151,20 @@
                                 <small class="text-muted">VD: Mua từ 500.000₫ → +200 điểm bonus.</small>
                             </div>
                         </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <span class="badge bg-warning mb-2">Loại 5</span>
+                                <h6>Đổi quà bằng điểm</h6>
+                                <small class="text-muted">Đổi quà vật lý trực tiếp tại POS bằng số điểm hiện có.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <span class="badge bg-info mb-2">Loại 6</span>
+                                <h6>Đổi voucher bằng điểm</h6>
+                                <small class="text-muted">Redeem điểm để nhận voucher dùng cho lần mua tiếp theo.</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -164,7 +178,9 @@
             1: 'Tích theo số tiền',
             2: 'Tích theo sản phẩm',
             3: 'Nhân hệ số',
-            4: 'Bonus sự kiện'
+            4: 'Bonus sự kiện',
+            5: 'Đổi quà bằng điểm',
+            6: 'Đổi voucher bằng điểm'
         };
 
         function loadDashboard() {

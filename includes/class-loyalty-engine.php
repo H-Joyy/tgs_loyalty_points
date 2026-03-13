@@ -32,12 +32,34 @@ function tgs_loyalty_get_member_info($wp_user_id)
     return TGS_Loyalty_Engine::get_member_info($wp_user_id);
 }
 
+function tgs_loyalty_get_rewards_for_customer($customer_id, $context = [])
+{
+    return TGS_Loyalty_Engine::get_rewards_for_customer($customer_id, $context);
+}
+
+function tgs_loyalty_issue_reward_vouchers($wp_user_id, $selected_rewards, $context = [])
+{
+    return TGS_Loyalty_Engine::issue_reward_vouchers($wp_user_id, $selected_rewards, $context);
+}
+
+function tgs_loyalty_apply_issued_voucher($coupon_code, $context = [])
+{
+    return TGS_Loyalty_Engine::apply_issued_voucher($coupon_code, $context);
+}
+
+function tgs_loyalty_consume_issued_vouchers($promotions, $context = [])
+{
+    return TGS_Loyalty_Engine::consume_issued_vouchers($promotions, $context);
+}
+
 // =========================================================================
 // ENGINE CLASS
 // =========================================================================
 
 class TGS_Loyalty_Engine
 {
+    const OPTION_ISSUED_VOUCHERS = 'tgs_loyalty_issued_vouchers';
+
     /**
      * Tính điểm nhận được từ đơn hàng (preview, chưa cộng thật).
      *
@@ -286,6 +308,311 @@ class TGS_Loyalty_Engine
         ];
     }
 
+    public static function get_rewards_for_customer($customer_id, $context = [])
+    {
+        $customer_id = intval($customer_id);
+        $default = [
+            'available_rewards' => [],
+            'customer_points'   => 0,
+        ];
+
+        if ($customer_id <= 0) {
+            return $default;
+        }
+
+        $wp_user_id = self::get_wp_user_id_from_customer($customer_id);
+        if ($wp_user_id <= 0) {
+            return $default;
+        }
+
+        TGS_Loyalty_DB::ensure_wallet($wp_user_id);
+
+        $member_info = self::get_member_info($wp_user_id);
+        $current_points = floatval($member_info['current_points'] ?? 0);
+        $tier_key = sanitize_key($member_info['tier_key'] ?? TGS_Loyalty_DB::get_default_tier_key());
+        $store_id = intval($context['store_id'] ?? get_current_blog_id());
+        $order_total = floatval($context['order_total'] ?? 0);
+        $policies = self::get_active_policies($store_id, true, [5, 6]);
+        $available_rewards = [];
+        $now = current_time('timestamp');
+
+        foreach ($policies as $policy) {
+            $policy_type = intval($policy->loyalty_policy_type);
+            $cfg = TGS_Loyalty_DB::parse_rules($policy);
+            if ($cfg['min_order_amount'] > 0 && $order_total > 0 && $order_total < $cfg['min_order_amount']) {
+                continue;
+            }
+
+            $reward_rows = $cfg['rules']['rewards'] ?? [];
+            if (!is_array($reward_rows)) {
+                continue;
+            }
+
+            foreach ($reward_rows as $reward) {
+                if (!is_array($reward) || intval($reward['status'] ?? 1) !== 1) {
+                    continue;
+                }
+
+                $start_at = !empty($reward['start_at']) ? strtotime((string) $reward['start_at']) : 0;
+                $end_at = !empty($reward['end_at']) ? strtotime((string) $reward['end_at']) : 0;
+                if (($start_at && $now < $start_at) || ($end_at && $now > $end_at)) {
+                    continue;
+                }
+
+                $min_tier = sanitize_key($reward['min_tier'] ?? TGS_Loyalty_DB::get_default_tier_key());
+                if (!self::is_tier_at_least($tier_key, $min_tier)) {
+                    continue;
+                }
+
+                $effective_points = self::resolve_reward_points($reward, $tier_key);
+                if ($effective_points <= 0) {
+                    continue;
+                }
+
+                $sku = sanitize_text_field($reward['sku'] ?? '');
+                $reward_code = sanitize_key($reward['reward_code'] ?? ($sku ?: ('reward_' . $policy->loyalty_policy_id . '_' . count($available_rewards))));
+                $reward_name = sanitize_text_field($reward['name'] ?? '');
+                $product_id = intval($reward['product_id'] ?? 0);
+                if ($reward_name === '' && $product_id > 0) {
+                    $reward_name = get_the_title($product_id) ?: 'Quà đổi điểm';
+                }
+                if ($reward_name === '') {
+                    $reward_name = $policy_type === 6 ? 'Voucher đổi điểm' : 'Quà đổi điểm';
+                }
+
+                $reward_payload = [
+                    'index'                  => 'lp_' . intval($policy->loyalty_policy_id) . '_' . $reward_code,
+                    'promoId'                => 'loyalty_reward_' . intval($policy->loyalty_policy_id),
+                    'policy_id'              => intval($policy->loyalty_policy_id),
+                    'program_id'             => intval($policy->loyalty_policy_id),
+                    'program_code'           => sanitize_text_field($policy->loyalty_policy_code),
+                    'program_title'          => sanitize_text_field($policy->loyalty_policy_title),
+                    'reward_code'            => $reward_code,
+                    'reward_type'            => $policy_type === 6 ? 'voucher' : 'product',
+                    'product_id'             => $product_id,
+                    'productId'              => $product_id,
+                    'sku'                    => $sku,
+                    'product_name'           => $reward_name,
+                    'quantity'               => max(1, intval($reward['quantity'] ?? 1)),
+                    'points'                 => $effective_points,
+                    'base_points'            => max(0, intval($reward['points_required'] ?? 0)),
+                    'customer_points'        => $current_points,
+                    'remaining_points_after' => max(0, $current_points - $effective_points),
+                    'can_redeem'             => $current_points >= $effective_points,
+                    'canRedeem'              => $current_points >= $effective_points,
+                    'is_tracking'            => $policy_type === 6 ? 0 : self::resolve_reward_tracking_flag($reward),
+                    'tier_key'               => $tier_key,
+                    'min_tier'               => $min_tier,
+                ];
+
+                if ($policy_type === 6) {
+                    $reward_payload['voucher_prefix'] = sanitize_text_field($reward['voucher_prefix'] ?? strtoupper($policy->loyalty_policy_code) . '-');
+                    $reward_payload['discount_type'] = sanitize_key($reward['discount_type'] ?? 'fixed');
+                    $reward_payload['discount_value'] = floatval($reward['discount_value'] ?? 0);
+                    $reward_payload['max_discount'] = floatval($reward['max_discount'] ?? 0);
+                    $reward_payload['min_order_amount'] = floatval($reward['min_order_amount'] ?? 0);
+                    $reward_payload['expires_in_days'] = max(0, intval($reward['expires_in_days'] ?? 0));
+                    $reward_payload['voucher_quantity'] = max(1, intval($reward['quantity'] ?? 1));
+                    $reward_payload['quantity'] = max(1, intval($reward['quantity'] ?? 1));
+                }
+
+                $available_rewards[] = $reward_payload;
+            }
+        }
+
+        return [
+            'available_rewards' => array_values($available_rewards),
+            'customer_points'   => $current_points,
+            'customer'          => [
+                'wp_user_id'     => $wp_user_id,
+                'tier_key'       => $tier_key,
+                'tier_name'      => sanitize_text_field($member_info['tier']['name'] ?? $tier_key),
+                'multiplier'     => floatval($member_info['multiplier'] ?? 1),
+                'points_to_next' => floatval($member_info['points_to_next'] ?? 0),
+            ],
+        ];
+    }
+
+    public static function issue_reward_vouchers($wp_user_id, $selected_rewards, $context = [])
+    {
+        $wp_user_id = intval($wp_user_id);
+        $selected_rewards = is_array($selected_rewards) ? $selected_rewards : [];
+        if ($wp_user_id <= 0 || empty($selected_rewards)) {
+            return [];
+        }
+
+        $registry = self::get_voucher_registry();
+        $issued = [];
+        $now = current_time('timestamp');
+        $store_id = intval($context['store_id'] ?? get_current_blog_id());
+
+        foreach ($selected_rewards as $reward) {
+            if (!is_array($reward) || sanitize_key($reward['reward_type'] ?? '') !== 'voucher') {
+                continue;
+            }
+
+            $quantity = max(1, intval($reward['voucher_quantity'] ?? $reward['quantity'] ?? 1));
+            $discount_type = sanitize_key($reward['discount_type'] ?? 'fixed');
+            $discount_value = floatval($reward['discount_value'] ?? 0);
+            if ($discount_value <= 0) {
+                continue;
+            }
+
+            $expires_in_days = max(0, intval($reward['expires_in_days'] ?? 0));
+            $expires_at = $expires_in_days > 0 ? strtotime('+' . $expires_in_days . ' days', $now) : 0;
+            $prefix = sanitize_text_field($reward['voucher_prefix'] ?? strtoupper(sanitize_key($reward['reward_code'] ?? 'LP')) . '-');
+
+            for ($index = 0; $index < $quantity; $index++) {
+                $code = self::generate_voucher_code($prefix, $registry);
+                $voucher = [
+                    'code' => $code,
+                    'reward_code' => sanitize_key($reward['reward_code'] ?? ''),
+                    'reward_name' => sanitize_text_field($reward['product_name'] ?? $reward['name'] ?? 'Voucher đổi điểm'),
+                    'policy_id' => intval($reward['policy_id'] ?? 0),
+                    'program_code' => sanitize_text_field($reward['program_code'] ?? ''),
+                    'wp_user_id' => $wp_user_id,
+                    'customer_id' => intval($context['customer_id'] ?? 0),
+                    'store_id' => $store_id,
+                    'points_cost' => floatval($reward['points'] ?? 0),
+                    'discount_type' => $discount_type,
+                    'discount_value' => $discount_value,
+                    'max_discount' => floatval($reward['max_discount'] ?? 0),
+                    'min_order_amount' => floatval($reward['min_order_amount'] ?? 0),
+                    'issued_at' => $now,
+                    'expires_at' => $expires_at,
+                    'status' => 'active',
+                    'used_count' => 0,
+                    'sale_ledger_id' => intval($context['sale_ledger_id'] ?? 0),
+                    'sale_code' => sanitize_text_field($context['sale_code'] ?? ''),
+                ];
+
+                $registry[$code] = $voucher;
+                $issued[] = $voucher;
+            }
+        }
+
+        if (!empty($issued)) {
+            self::save_voucher_registry($registry);
+        }
+
+        return $issued;
+    }
+
+    public static function apply_issued_voucher($coupon_code, $context = [])
+    {
+        $coupon_code = strtoupper(sanitize_text_field($coupon_code));
+        if ($coupon_code === '') {
+            return new WP_Error('empty_code', 'Mã voucher trống');
+        }
+
+        $registry = self::get_voucher_registry();
+        $voucher = $registry[$coupon_code] ?? null;
+        if (empty($voucher) || !is_array($voucher)) {
+            return new WP_Error('not_found', 'Voucher đổi điểm không tồn tại hoặc đã hết hạn');
+        }
+
+        if (($voucher['status'] ?? '') !== 'active') {
+            return new WP_Error('inactive', 'Voucher đổi điểm không còn hiệu lực');
+        }
+
+        $now = current_time('timestamp');
+        $expires_at = intval($voucher['expires_at'] ?? 0);
+        if ($expires_at > 0 && $now > $expires_at) {
+            return new WP_Error('expired', 'Voucher đổi điểm đã hết hạn');
+        }
+
+        $cart_total = floatval($context['cart_total'] ?? 0);
+        $min_order_amount = floatval($voucher['min_order_amount'] ?? 0);
+        if ($min_order_amount > 0 && $cart_total < $min_order_amount) {
+            return new WP_Error('min_order', 'Đơn hàng chưa đạt giá trị tối thiểu để dùng voucher');
+        }
+
+        $customer_id = intval($context['customer_id'] ?? 0);
+        if ($customer_id > 0) {
+            $wp_user_id = self::get_wp_user_id_from_customer($customer_id);
+            if ($wp_user_id > 0 && intval($voucher['wp_user_id'] ?? 0) > 0 && intval($voucher['wp_user_id']) !== $wp_user_id) {
+                return new WP_Error('owner_mismatch', 'Voucher này thuộc về khách hàng khác');
+            }
+        }
+
+        $discount_type = sanitize_key($voucher['discount_type'] ?? 'fixed');
+        $discount_value = floatval($voucher['discount_value'] ?? 0);
+        $max_discount = floatval($voucher['max_discount'] ?? 0);
+        if ($discount_value <= 0) {
+            return new WP_Error('invalid_discount', 'Voucher không có giá trị giảm hợp lệ');
+        }
+
+        $discount_amount = $discount_type === 'percent'
+            ? ($cart_total * ($discount_value / 100))
+            : $discount_value;
+        if ($discount_type === 'percent' && $max_discount > 0) {
+            $discount_amount = min($discount_amount, $max_discount);
+        }
+        $discount_amount = max(0, min($discount_amount, $cart_total));
+
+        if ($discount_amount <= 0) {
+            return new WP_Error('not_applicable', 'Voucher chưa đủ điều kiện áp dụng');
+        }
+
+        return [
+            'id' => 'loyalty_voucher_' . sanitize_key($coupon_code),
+            'name' => sanitize_text_field($voucher['reward_name'] ?? ('Voucher ' . $coupon_code)),
+            'type' => 'voucher',
+            'code' => $coupon_code,
+            'priority' => 0,
+            'appliedViaCoupon' => true,
+            'calculated_result' => [
+                'discount_amount' => $discount_amount,
+                'discount_type' => $discount_type,
+                'discount_value' => $discount_value,
+                'max_discount' => $max_discount,
+                'min_order_amount' => $min_order_amount,
+                'loyalty_voucher' => true,
+                'voucher_code' => $coupon_code,
+            ],
+        ];
+    }
+
+    public static function consume_issued_vouchers($promotions, $context = [])
+    {
+        $promotions = is_array($promotions) ? $promotions : [];
+        if (empty($promotions)) {
+            return [];
+        }
+
+        $registry = self::get_voucher_registry();
+        $consumed = [];
+
+        foreach ($promotions as $promotion) {
+            if (!is_array($promotion)) {
+                continue;
+            }
+
+            $result = is_array($promotion['calculated_result'] ?? null) ? $promotion['calculated_result'] : [];
+            if (empty($result['loyalty_voucher']) || empty($result['voucher_code'])) {
+                continue;
+            }
+
+            $code = strtoupper(sanitize_text_field($result['voucher_code']));
+            if (empty($registry[$code]) || !is_array($registry[$code])) {
+                continue;
+            }
+
+            $registry[$code]['status'] = 'used';
+            $registry[$code]['used_count'] = intval($registry[$code]['used_count'] ?? 0) + 1;
+            $registry[$code]['used_at'] = current_time('timestamp');
+            $registry[$code]['used_sale_ledger_id'] = intval($context['sale_ledger_id'] ?? 0);
+            $registry[$code]['used_sale_code'] = sanitize_text_field($context['sale_code'] ?? '');
+            $consumed[] = $registry[$code];
+        }
+
+        if (!empty($consumed)) {
+            self::save_voucher_registry($registry);
+        }
+
+        return $consumed;
+    }
+
     /* ================================================================
      *  VÍ ĐIỂM — gọi TGS_Loyalty_DB trực tiếp (đã gộp wallet)
      * ================================================================ */
@@ -315,19 +642,29 @@ class TGS_Loyalty_Engine
      *  INTERNAL: QUERY & EVALUATE
      * ================================================================ */
 
-    private static function get_active_policies($store_id)
+    private static function get_active_policies($store_id, $auto_apply_only = true, $types = [])
     {
         global $wpdb;
         $table = $wpdb->prefix . TGS_Loyalty_DB::TABLE_POLICY;
         $now   = time();
 
+        $where = "is_deleted = 0
+               AND loyalty_policy_status = 1
+               AND (loyalty_policy_start_date = 0 OR loyalty_policy_start_date <= %d)
+               AND (loyalty_policy_end_date = 0   OR loyalty_policy_end_date >= %d)";
+
+        if ($auto_apply_only) {
+            $where .= ' AND auto_apply = 1';
+        }
+
+        $types = array_values(array_filter(array_map('intval', (array) $types)));
+        if (!empty($types)) {
+            $where .= ' AND loyalty_policy_type IN (' . implode(',', $types) . ')';
+        }
+
         $results = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$table}
-             WHERE is_deleted = 0
-               AND loyalty_policy_status = 1
-               AND auto_apply = 1
-               AND (loyalty_policy_start_date = 0 OR loyalty_policy_start_date <= %d)
-               AND (loyalty_policy_end_date = 0   OR loyalty_policy_end_date >= %d)
+             WHERE {$where}
              ORDER BY loyalty_policy_priority ASC, loyalty_policy_id DESC",
             $now,
             $now
@@ -349,6 +686,90 @@ class TGS_Loyalty_Engine
         $blog_ids = json_decode($policy->apply_to_blog_ids ?? '[]', true);
         if (empty($blog_ids)) return true;
         return in_array(intval($store_id), array_map('intval', $blog_ids));
+    }
+
+    private static function get_wp_user_id_from_customer($customer_id)
+    {
+        global $wpdb;
+
+        $person_table = $wpdb->prefix . 'local_ledger_person';
+        if ($wpdb->get_var("SHOW TABLES LIKE '$person_table'") !== $person_table) {
+            return 0;
+        }
+
+        return intval($wpdb->get_var($wpdb->prepare(
+            "SELECT user_wp_id FROM {$person_table}
+             WHERE local_ledger_person_id = %d
+               AND (is_deleted = 0 OR is_deleted IS NULL)
+             LIMIT 1",
+            $customer_id
+        )));
+    }
+
+    private static function is_tier_at_least($current_tier, $required_tier)
+    {
+        $tiers = array_keys(TGS_Loyalty_DB::get_tier_definitions());
+        $current_index = array_search(sanitize_key($current_tier), $tiers, true);
+        $required_index = array_search(sanitize_key($required_tier), $tiers, true);
+
+        if ($required_index === false) {
+            return true;
+        }
+
+        if ($current_index === false) {
+            return false;
+        }
+
+        return $current_index >= $required_index;
+    }
+
+    private static function resolve_reward_points($reward, $tier_key)
+    {
+        $base_points = max(0, intval($reward['points_required'] ?? 0));
+        $tier_costs = $reward['tier_costs'] ?? [];
+        if (is_array($tier_costs)) {
+            $tier_key = sanitize_key($tier_key);
+            if (isset($tier_costs[$tier_key])) {
+                return max(0, intval($tier_costs[$tier_key]));
+            }
+        }
+
+        return $base_points;
+    }
+
+    private static function resolve_reward_tracking_flag($reward)
+    {
+        if (isset($reward['is_tracking'])) {
+            return !empty($reward['is_tracking']) ? 1 : 0;
+        }
+
+        return 0;
+    }
+
+    private static function get_voucher_registry()
+    {
+        $registry = get_option(self::OPTION_ISSUED_VOUCHERS, []);
+        return is_array($registry) ? $registry : [];
+    }
+
+    private static function save_voucher_registry($registry)
+    {
+        $registry = is_array($registry) ? $registry : [];
+        update_option(self::OPTION_ISSUED_VOUCHERS, $registry, false);
+    }
+
+    private static function generate_voucher_code($prefix, $registry)
+    {
+        $prefix = strtoupper(preg_replace('/[^A-Z0-9\-]/', '', (string) $prefix));
+        if ($prefix === '') {
+            $prefix = 'LP-';
+        }
+
+        do {
+            $code = $prefix . strtoupper(wp_generate_password(8, false, false));
+        } while (isset($registry[$code]));
+
+        return $code;
     }
 
     /**

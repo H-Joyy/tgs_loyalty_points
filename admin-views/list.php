@@ -21,6 +21,8 @@
                         <option value="2">Theo sản phẩm</option>
                         <option value="3">Nhân hệ số</option>
                         <option value="4">Bonus sự kiện</option>
+                        <option value="5">Đổi quà bằng điểm</option>
+                        <option value="6">Đổi voucher bằng điểm</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -88,13 +90,17 @@
             1: 'Theo số tiền',
             2: 'Theo sản phẩm',
             3: 'Nhân hệ số',
-            4: 'Bonus sự kiện'
+            4: 'Bonus sự kiện',
+            5: 'Đổi quà bằng điểm',
+            6: 'Đổi voucher bằng điểm'
         };
         const TYPE_COLORS = {
             1: 'primary',
             2: 'primary',
             3: 'primary',
-            4: 'primary'
+            4: 'primary',
+            5: 'warning',
+            6: 'info'
         };
         const STATUS_LABELS = {
             0: 'Nháp',

@@ -27,6 +27,8 @@
                                 <option value="2">2 — Tích theo sản phẩm</option>
                                 <option value="3">3 — Nhân hệ số điểm</option>
                                 <option value="4">4 — Bonus sự kiện</option>
+                                <option value="5">5 — Đổi quà bằng điểm</option>
+                                <option value="6">6 — Đổi voucher bằng điểm</option>
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -158,6 +160,8 @@
     </div>
 </div>
 
+<?php $reward_tiers = class_exists('TGS_Loyalty_DB') ? TGS_Loyalty_DB::get_tier_definitions() : ['member' => ['name' => 'Thành viên']]; ?>
+
 <script>
     jQuery(function($) {
         const params = new URLSearchParams(window.location.search);
@@ -169,13 +173,22 @@
 
         const $type = $('#policy-type');
         const $panel = $('#rules-panel');
+        const rewardTiers = <?php echo wp_json_encode($reward_tiers); ?>;
+
+        function buildRewardTierOptions(selected) {
+            return Object.entries(rewardTiers).map(function(entry) {
+                const key = entry[0];
+                const tier = entry[1] || {};
+                return '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + (tier.name || key) + '</option>';
+            }).join('');
+        }
 
         // ── Rules panel render ──
         function addProductRule(sku, pts) {
             $('#rules-rows').append(
                 '<div class="row g-2 mb-2 rule-row align-items-end">' +
                 '<div class="col-md-5"><label class="form-label">SKU</label>' +
-                '<input type="text" class="form-control rule-sku" value="' + (sku || '') + '"></div>' +
+                '<input type="text" class="form-control rule-sku" value="' + (sku || '') + '" placeholder="Tìm SKU hoặc tên SP..." autocomplete="off"></div>' +
                 '<div class="col-md-4"><label class="form-label">Điểm / SP</label>' +
                 '<input type="number" class="form-control rule-points" value="' + (pts || 10) + '" min="0"></div>' +
                 '<div class="col-md-3"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>'
@@ -191,6 +204,49 @@
                 '<input type="number" class="form-control rule-bonus-points" value="' + (bonusPts || 100) + '" min="0"></div>' +
                 '<div class="col-md-3"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>'
             );
+        }
+
+        function addRewardRule(reward) {
+            reward = reward || {};
+            $('#rules-rows').append(
+                '<div class="border rounded p-3 mb-3 rule-row reward-row">' +
+                '<div class="row g-2 align-items-end">' +
+                '<div class="col-md-3"><label class="form-label">Mã quà</label><input type="text" class="form-control rule-reward-code" value="' + (reward.reward_code || '') + '"></div>' +
+                '<div class="col-md-3"><label class="form-label">Product ID</label><input type="number" class="form-control rule-reward-product-id" value="' + Number(reward.product_id || 0) + '" min="0"></div>' +
+                '<div class="col-md-3"><label class="form-label">SKU</label><input type="text" class="form-control rule-reward-sku" value="' + (reward.sku || '') + '" placeholder="Tìm SKU..." autocomplete="off"></div>' +
+                '<div class="col-md-3"><label class="form-label">Tên quà</label><input type="text" class="form-control rule-reward-name" value="' + (reward.name || '') + '"></div>' +
+                '<div class="col-md-2"><label class="form-label">Số lượng</label><input type="number" class="form-control rule-reward-qty" value="' + Number(reward.quantity || 1) + '" min="1"></div>' +
+                '<div class="col-md-3"><label class="form-label">Điểm cần đổi</label><input type="number" class="form-control rule-reward-points" value="' + Number(reward.points_required || 0) + '" min="1"></div>' +
+                '<div class="col-md-3"><label class="form-label">Tier tối thiểu</label><select class="form-select rule-reward-min-tier">' + buildRewardTierOptions(reward.min_tier || 'member') + '</select></div>' +
+                '<div class="col-md-2"><label class="form-label">Tracking</label><select class="form-select rule-reward-tracking"><option value="0">Không</option><option value="1">Có</option></select></div>' +
+                '<div class="col-md-2"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>' +
+                '</div>'
+            );
+            const $row = $('#rules-rows .reward-row').last();
+            $row.find('.rule-reward-tracking').val(String(reward.is_tracking ? 1 : 0));
+        }
+
+        function addVoucherRule(reward) {
+            reward = reward || {};
+            $('#rules-rows').append(
+                '<div class="border rounded p-3 mb-3 rule-row voucher-row">' +
+                '<div class="row g-2 align-items-end">' +
+                '<div class="col-md-3"><label class="form-label">Mã voucher</label><input type="text" class="form-control rule-voucher-code" value="' + (reward.reward_code || '') + '"></div>' +
+                '<div class="col-md-3"><label class="form-label">Tên voucher</label><input type="text" class="form-control rule-voucher-name" value="' + (reward.name || '') + '"></div>' +
+                '<div class="col-md-2"><label class="form-label">Số lượng</label><input type="number" class="form-control rule-voucher-qty" value="' + Number(reward.quantity || 1) + '" min="1"></div>' +
+                '<div class="col-md-2"><label class="form-label">Điểm đổi</label><input type="number" class="form-control rule-voucher-points" value="' + Number(reward.points_required || 0) + '" min="1"></div>' +
+                '<div class="col-md-2"><label class="form-label">Tier tối thiểu</label><select class="form-select rule-voucher-min-tier">' + buildRewardTierOptions(reward.min_tier || 'member') + '</select></div>' +
+                '<div class="col-md-3"><label class="form-label">Tiền tố code</label><input type="text" class="form-control rule-voucher-prefix" value="' + (reward.voucher_prefix || '') + '"></div>' +
+                '<div class="col-md-3"><label class="form-label">Loại giảm</label><select class="form-select rule-voucher-discount-type"><option value="fixed">Giảm tiền</option><option value="percent">Giảm %</option></select></div>' +
+                '<div class="col-md-2"><label class="form-label">Giá trị</label><input type="number" class="form-control rule-voucher-discount-value" value="' + Number(reward.discount_value || 0) + '" min="1"></div>' +
+                '<div class="col-md-2"><label class="form-label">Giảm tối đa</label><input type="number" class="form-control rule-voucher-max-discount" value="' + Number(reward.max_discount || 0) + '" min="0"></div>' +
+                '<div class="col-md-2"><label class="form-label">Đơn tối thiểu</label><input type="number" class="form-control rule-voucher-min-order" value="' + Number(reward.min_order_amount || 0) + '" min="0"></div>' +
+                '<div class="col-md-2"><label class="form-label">Hạn dùng (ngày)</label><input type="number" class="form-control rule-voucher-expiry" value="' + Number(reward.expires_in_days || 0) + '" min="0"></div>' +
+                '<div class="col-md-1"><button class="btn btn-sm btn-outline-primary btn-remove-rule mt-4"><i class="bx bx-trash"></i></button></div></div>' +
+                '</div>'
+            );
+            const $row = $('#rules-rows .voucher-row').last();
+            $row.find('.rule-voucher-discount-type').val(reward.discount_type || 'fixed');
         }
 
         function renderRulesPanel(type, rules) {
@@ -223,6 +279,22 @@
                 } else {
                     addBonusRule();
                 }
+            } else if (type === 5) {
+                $panel.append('<div id="rules-rows"></div>');
+                const rewardRows = Array.isArray(rules?.rewards) ? rules.rewards : [];
+                if (rewardRows.length) {
+                    rewardRows.forEach(r => addRewardRule(r));
+                } else {
+                    addRewardRule();
+                }
+            } else if (type === 6) {
+                $panel.append('<div id="rules-rows"></div>');
+                const rewardRows = Array.isArray(rules?.rewards) ? rules.rewards : [];
+                if (rewardRows.length) {
+                    rewardRows.forEach(r => addVoucherRule(r));
+                } else {
+                    addVoucherRule();
+                }
             }
         }
 
@@ -234,10 +306,75 @@
             const t = parseInt($type.val());
             if (t === 2) addProductRule();
             else if (t === 4) addBonusRule();
+            else if (t === 5) addRewardRule();
+            else if (t === 6) addVoucherRule();
         });
 
         $(document).on('click', '.btn-remove-rule', function() {
             $(this).closest('.rule-row').remove();
+        });
+
+        // ── SKU AUTOCOMPLETE ──
+        var $skuDropdown = $('<div class="list-group shadow position-fixed" style="z-index:9999;max-height:220px;overflow-y:auto;display:none"></div>').appendTo('body');
+        var _skuTimer = null;
+        var skuSelectors = '.rule-sku, .rule-reward-sku';
+
+        $(document).on('input', skuSelectors, function() {
+            var $inp = $(this);
+            var q = $inp.val().trim();
+            clearTimeout(_skuTimer);
+            if (!q || q.length < 2) {
+                $skuDropdown.hide();
+                return;
+            }
+            _skuTimer = setTimeout(function() {
+                $.post(tgsLoyalty.ajaxUrl, {
+                    action: 'tgs_loyalty_get_products',
+                    nonce: tgsLoyalty.nonce,
+                    search: q
+                }, function(r) {
+                    if (!r.success || !r.data.length) {
+                        $skuDropdown.hide();
+                        return;
+                    }
+                    var html = '';
+                    r.data.forEach(function(p) {
+                        html += '<a href="#" class="list-group-item list-group-item-action py-1 px-2 sku-pick"' +
+                            ' data-sku="' + p.local_product_sku + '" data-name="' + (p.local_product_name || '') + '">' +
+                            '<code class="me-1">' + p.local_product_sku + '</code> ' + p.local_product_name +
+                            ' <small class="text-muted">(' + Number(p.local_product_price_after_tax || 0).toLocaleString('vi-VN') + 'đ)</small></a>';
+                    });
+                    $skuDropdown.html(html);
+                    var off = $inp.offset();
+                    $skuDropdown.css({
+                        top: off.top + $inp.outerHeight(),
+                        left: off.left,
+                        width: Math.max($inp.outerWidth(), 320)
+                    }).show();
+                    $skuDropdown.data('target', $inp);
+                });
+            }, 300);
+        });
+
+        $(document).on('click', '.sku-pick', function(e) {
+            e.preventDefault();
+            var $inp = $skuDropdown.data('target');
+            if ($inp) {
+                $inp.val($(this).data('sku'));
+                $inp.attr('title', $(this).data('name'));
+                var $row = $inp.closest('.rule-row');
+                var $nameField = $row.find('.rule-reward-name');
+                if ($nameField.length && !$nameField.val().trim()) {
+                    $nameField.val($(this).data('name'));
+                }
+            }
+            $skuDropdown.hide();
+        });
+
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.list-group, ' + skuSelectors).length) {
+                $skuDropdown.hide();
+            }
         });
 
         function buildRules() {
@@ -269,6 +406,63 @@
                     });
                 });
                 return JSON.stringify(rules);
+            }
+
+            if (type === 5) {
+                const rewards = [];
+                $('#rules-rows .reward-row').each(function() {
+                    const pointsRequired = parseInt($(this).find('.rule-reward-points').val(), 10) || 0;
+                    const productId = parseInt($(this).find('.rule-reward-product-id').val(), 10) || 0;
+                    const name = $(this).find('.rule-reward-name').val().trim();
+                    if (pointsRequired <= 0 || (!productId && !name)) {
+                        return;
+                    }
+
+                    rewards.push({
+                        reward_code: $(this).find('.rule-reward-code').val().trim(),
+                        product_id: productId,
+                        sku: $(this).find('.rule-reward-sku').val().trim(),
+                        name: name,
+                        quantity: parseInt($(this).find('.rule-reward-qty').val(), 10) || 1,
+                        points_required: pointsRequired,
+                        min_tier: $(this).find('.rule-reward-min-tier').val() || 'member',
+                        is_tracking: parseInt($(this).find('.rule-reward-tracking').val(), 10) || 0,
+                        status: 1
+                    });
+                });
+                return JSON.stringify({
+                    rewards: rewards
+                });
+            }
+
+            if (type === 6) {
+                const rewards = [];
+                $('#rules-rows .voucher-row').each(function() {
+                    const pointsRequired = parseInt($(this).find('.rule-voucher-points').val(), 10) || 0;
+                    const name = $(this).find('.rule-voucher-name').val().trim();
+                    const discountValue = parseFloat($(this).find('.rule-voucher-discount-value').val()) || 0;
+                    if (pointsRequired <= 0 || !name || discountValue <= 0) {
+                        return;
+                    }
+
+                    rewards.push({
+                        reward_code: $(this).find('.rule-voucher-code').val().trim(),
+                        name: name,
+                        quantity: parseInt($(this).find('.rule-voucher-qty').val(), 10) || 1,
+                        points_required: pointsRequired,
+                        min_tier: $(this).find('.rule-voucher-min-tier').val() || 'member',
+                        voucher_prefix: $(this).find('.rule-voucher-prefix').val().trim(),
+                        discount_type: $(this).find('.rule-voucher-discount-type').val() || 'fixed',
+                        discount_value: discountValue,
+                        max_discount: parseFloat($(this).find('.rule-voucher-max-discount').val()) || 0,
+                        min_order_amount: parseFloat($(this).find('.rule-voucher-min-order').val()) || 0,
+                        expires_in_days: parseInt($(this).find('.rule-voucher-expiry').val(), 10) || 0,
+                        status: 1
+                    });
+                });
+                return JSON.stringify({
+                    rewards: rewards
+                });
             }
             return '[]';
         }

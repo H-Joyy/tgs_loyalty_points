@@ -31,6 +31,7 @@ class TGS_Loyalty_Points_Plugin
     {
         require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-db.php';
         require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-engine.php';
+        require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-global-products.php';
         require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-ajax.php';
         $this->init_hooks();
     }

@@ -441,56 +441,16 @@ class TGS_Loyalty_Ajax
     public static function get_products()
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
-        global $wpdb;
 
         $blog_id = intval($_POST['blog_id'] ?? 0);
         $search  = sanitize_text_field($_POST['search'] ?? '');
 
-        $where = '(is_deleted IS NULL OR is_deleted = 0)';
-        if ($search) {
-            $like  = '%' . $wpdb->esc_like($search) . '%';
-            $where .= $wpdb->prepare(
-                " AND (local_product_name LIKE %s OR local_product_sku LIKE %s)",
-                $like,
-                $like
-            );
-        }
-
-        if ($blog_id > 0) {
-            $prefix = $wpdb->get_blog_prefix($blog_id);
-            $table  = $prefix . 'local_product_name';
-            $items  = $wpdb->get_results(
-                "SELECT local_product_sku, local_product_name, local_product_price, local_product_price_after_tax
-                 FROM `{$table}` WHERE {$where} ORDER BY local_product_name ASC LIMIT 50"
-            );
-            wp_send_json_success($items ?: []);
-            return;
-        }
-
-        $site_ids = get_sites(['fields' => 'ids', 'number' => 0]);
-        $unions   = [];
-        foreach ($site_ids as $sid) {
-            $prefix = $wpdb->get_blog_prefix(intval($sid));
-            $table  = $prefix . 'local_product_name';
-            if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table)))) {
-                $unions[] = "SELECT local_product_sku, local_product_name, local_product_price,
-                             local_product_price_after_tax FROM `{$table}` WHERE {$where}";
-            }
-        }
-
-        if (empty($unions)) {
+        if (!class_exists('TGS_Loyalty_Global_Products')) {
             wp_send_json_success([]);
             return;
         }
 
-        if (count($unions) === 1) {
-            $sql = $unions[0] . ' ORDER BY local_product_name ASC LIMIT 50';
-        } else {
-            $sql = 'SELECT * FROM (' . implode(' UNION ALL ', $unions)
-                . ') AS combined GROUP BY local_product_sku ORDER BY local_product_name ASC LIMIT 50';
-        }
-
-        $items = $wpdb->get_results($sql);
+        $items = TGS_Loyalty_Global_Products::search_products($search, $blog_id, 50);
         wp_send_json_success($items ?: []);
     }
 }

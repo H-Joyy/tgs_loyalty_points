@@ -33,6 +33,7 @@ class TGS_Loyalty_Points_Plugin
         require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-engine.php';
         require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-global-products.php';
         require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-ajax.php';
+        require_once TGS_LOYALTY_PLUGIN_DIR . 'includes/class-loyalty-react-api.php';
         $this->init_hooks();
     }
 
@@ -44,6 +45,7 @@ class TGS_Loyalty_Points_Plugin
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('user_register', [$this, 'on_user_register']);
         TGS_Loyalty_Ajax::init();
+        TGS_Loyalty_React_Api::init();
     }
 
     /**

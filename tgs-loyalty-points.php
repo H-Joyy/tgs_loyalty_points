@@ -242,3 +242,25 @@ if (!tgs_loyalty_is_legacy_wallet_plugin_active() && !function_exists('user_wall
         return TGS_Loyalty_DB::get_tier_definitions();
     }
 }
+
+/**
+ * [2026-11-25 Võ Hoàng] Shop đã chạy POS React (tgs_pos bật filter `tgs_loyalty_admin_locked`): chính sách tích điểm, cài đặt và
+ * điều chỉnh điểm làm ở phần mềm kế toán — màn ở đây chỉ xem. Không có tgs_pos thì filter không ai bật, màn chạy như cũ.
+ */
+function tgs_loyalty_admin_locked()
+{
+    return (bool) apply_filters('tgs_loyalty_admin_locked', false);
+}
+
+function tgs_loyalty_locked_banner()
+{
+    if (!tgs_loyalty_admin_locked()) {
+        return;
+    }
+    echo '<div class="alert alert-warning d-flex align-items-start gap-2" role="alert" id="tgs-loyalty-locked">'
+        . '<i class="bx bx-lock-alt fs-4"></i><div><strong>Chỉ xem.</strong> Shop này đã chạy máy bán POS React: chương trình tích điểm, '
+        . 'cài đặt và cộng / trừ điểm nay làm ở phần mềm kế toán (open-ketoan). Sửa ở đây sẽ không được lưu.</div></div>'
+        . '<script>document.addEventListener("DOMContentLoaded",function(){var r=document.getElementById("tgs-loyalty-locked");'
+        . 'if(!r)return;var c=r.parentElement;c.querySelectorAll("button.btn-primary,button.btn-success,button.btn-danger,a.btn-primary,[data-loyalty-write]")'
+        . '.forEach(function(b){b.setAttribute("disabled","disabled");b.classList.add("disabled");b.title="Chỉ xem — làm ở phần mềm kế toán";});});</script>';
+}

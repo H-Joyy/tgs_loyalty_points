@@ -3,6 +3,7 @@
 <?php $settings = TGS_Loyalty_DB::get_settings(); ?>
 
 <div class="container-xxl flex-grow-1 container-p-y">
+    <?php if (function_exists('tgs_loyalty_locked_banner')) tgs_loyalty_locked_banner(); ?>
     <h4 class="fw-bold py-3 mb-4">
         <span class="text-muted fw-light">Tích điểm /</span> Cài đặt
     </h4>

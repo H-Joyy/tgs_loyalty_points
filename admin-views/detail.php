@@ -1,6 +1,7 @@
 <?php if (!defined('ABSPATH')) exit; ?>
 
 <div class="container-xxl flex-grow-1 container-p-y">
+    <?php if (function_exists('tgs_loyalty_locked_banner')) tgs_loyalty_locked_banner(); ?>
     <h4 class="fw-bold py-3 mb-4">
         <span class="text-muted fw-light">Tích điểm /</span> Chi tiết chương trình
     </h4>

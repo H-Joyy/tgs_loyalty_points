@@ -252,6 +252,20 @@ function tgs_loyalty_admin_locked()
     return (bool) apply_filters('tgs_loyalty_admin_locked', false);
 }
 
+/** [2026-11-27 Võ Hoàng] Nút mở thẳng màn Điểm thành viên (BH19) ở phần mềm kế toán — qua vé đăng nhập của Cổng kế toán nếu có. */
+function tgs_loyalty_ketoan_link()
+{
+    $path = '/app/loyalty/diem';
+    if (class_exists('TGS_Acc_Embed') && method_exists('TGS_Acc_Embed', 'open_url')) {
+        $url = (string) TGS_Acc_Embed::open_url($path);
+    } elseif (class_exists('TGS_Acc_Config') && method_exists('TGS_Acc_Config', 'web_url') && TGS_Acc_Config::web_url() !== '') {
+        $url = rtrim((string) TGS_Acc_Config::web_url(), '/') . $path;
+    } else {
+        return '';
+    }
+    return ' <a class="btn btn-sm btn-outline-primary ms-1" target="_blank" rel="noopener" href="' . esc_url($url) . '">Mở Điểm thành viên ở kế toán ↗</a>';
+}
+
 function tgs_loyalty_locked_banner()
 {
     if (!tgs_loyalty_admin_locked()) {
@@ -259,7 +273,8 @@ function tgs_loyalty_locked_banner()
     }
     echo '<div class="alert alert-warning d-flex align-items-start gap-2" role="alert" id="tgs-loyalty-locked">'
         . '<i class="bx bx-lock-alt fs-4"></i><div><strong>Chỉ xem.</strong> Shop này đã chạy máy bán POS React: chương trình tích điểm, '
-        . 'cài đặt và cộng / trừ điểm nay làm ở phần mềm kế toán (open-ketoan). Sửa ở đây sẽ không được lưu.</div></div>'
+        . 'cài đặt và cộng / trừ điểm nay làm ở phần mềm kế toán (open-ketoan). Sửa ở đây sẽ không được lưu.'
+        . tgs_loyalty_ketoan_link() . '</div></div>'
         . '<script>document.addEventListener("DOMContentLoaded",function(){var r=document.getElementById("tgs-loyalty-locked");'
         . 'if(!r)return;var c=r.parentElement;c.querySelectorAll("button.btn-primary,button.btn-success,button.btn-danger,a.btn-primary,[data-loyalty-write]")'
         . '.forEach(function(b){b.setAttribute("disabled","disabled");b.classList.add("disabled");b.title="Chỉ xem — làm ở phần mềm kế toán";});});</script>';

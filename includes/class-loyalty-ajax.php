@@ -11,6 +11,17 @@ if (!defined('ABSPATH')) exit;
  */
 class TGS_Loyalty_Ajax
 {
+    /**
+     * [2026-11-27 Võ Hoàng] Shop đã chạy POS React: chính sách, cài đặt, cộng / trừ điểm khai ở phần mềm kế toán (BH19) — chặn ghi
+     * ở máy chủ (trước đây chỉ khoá nút trên giao diện, gọi AJAX thẳng vẫn lưu được).
+     */
+    private static function deny_if_locked()
+    {
+        if (function_exists('tgs_loyalty_admin_locked') && tgs_loyalty_admin_locked()) {
+            wp_send_json_error(['message' => 'Chỉ xem: shop đã chạy POS React — chương trình tích điểm, cài đặt và cộng / trừ điểm làm ở phần mềm kế toán (Điểm thành viên BH19).'], 403);
+        }
+    }
+
     public static function init()
     {
         // ── Policy CRUD ──
@@ -79,6 +90,7 @@ class TGS_Loyalty_Ajax
     public static function policy_save()
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+        self::deny_if_locked();
 
         $id = intval($_POST['loyalty_policy_id'] ?? 0);
 
@@ -135,6 +147,7 @@ class TGS_Loyalty_Ajax
     public static function policy_delete()
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+        self::deny_if_locked();
 
         $id = intval($_POST['loyalty_policy_id'] ?? 0);
         if (!$id) wp_send_json_error(['message' => 'Thiếu ID.']);
@@ -146,6 +159,7 @@ class TGS_Loyalty_Ajax
     public static function policy_clone()
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+        self::deny_if_locked();
 
         $id = intval($_POST['loyalty_policy_id'] ?? 0);
         if (!$id) wp_send_json_error(['message' => 'Thiếu ID.']);
@@ -174,6 +188,7 @@ class TGS_Loyalty_Ajax
     public static function settings_save()
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+        self::deny_if_locked();
 
         $tiers = json_decode(wp_unslash($_POST['tiers'] ?? '[]'), true);
         if (!is_array($tiers)) {
@@ -223,6 +238,7 @@ class TGS_Loyalty_Ajax
     public static function member_adjust()
     {
         check_ajax_referer('tgs_loyalty_nonce', 'nonce');
+        self::deny_if_locked();
 
         $wp_user_id  = intval($_POST['wp_user_id'] ?? 0);
         $points      = floatval($_POST['points'] ?? 0);
